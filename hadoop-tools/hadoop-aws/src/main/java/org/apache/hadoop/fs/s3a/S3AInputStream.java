@@ -69,6 +69,7 @@ import static org.apache.hadoop.fs.VectoredReadUtils.isOrderedDisjoint;
 import static org.apache.hadoop.fs.VectoredReadUtils.mergeSortedRanges;
 import static org.apache.hadoop.fs.VectoredReadUtils.validateAndSortRanges;
 import static org.apache.hadoop.fs.s3a.Invoker.onceTrackingDuration;
+import static org.apache.hadoop.fs.s3a.impl.InternalConstants.CONNECTION_LEAKS_LOG_NAME;
 import static org.apache.hadoop.util.StringUtils.toLowerCase;
 import static org.apache.hadoop.util.functional.FutureIO.awaitFuture;
 
@@ -116,6 +117,15 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
    */
   private static final int TMP_BUFFER_MAX_SIZE = 64 * 1024;
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(S3AInputStream.class);
+
+  /**
+   * Special log for leaked streams.
+   */
+  private static final Logger LEAK_LOG =
+      LoggerFactory.getLogger(CONNECTION_LEAKS_LOG_NAME);
+
   /**
    * Atomic boolean variable to stop all ongoing vectored read operation
    * for this input stream. This will be set to true when the stream is
@@ -159,8 +169,7 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
   private final Optional<Long> fileLength;
 
   private final String uri;
-  private static final Logger LOG =
-      LoggerFactory.getLogger(S3AInputStream.class);
+
   private final S3AInputStreamStatistics streamStatistics;
   private S3AInputPolicy inputPolicy;
   private long readahead = Constants.DEFAULT_READAHEAD_RANGE;
@@ -203,6 +212,12 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
   private final IOStatisticsAggregator threadIOStatistics;
 
   /**
+   * Stack trace of object creation; used to
+   * report of unclosed streams in finalize().
+   */
+  private final IOException leakException;
+
+  /**
    * Create the stream.
    * This does not attempt to open it; that is only done on the first
    * actual read() operation.
@@ -242,6 +257,41 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
     this.boundedThreadPool = boundedThreadPool;
     this.vectoredIOContext = context.getVectoredIOContext();
     this.threadIOStatistics = requireNonNull(ctx.getIOStatisticsAggregator());
+    // build the warning thread. This is the error string to print, so as to avoid
+    // constructing objects in finalize().
+    this.leakException = new IOException("HTTP connection not closed while reading " + uri
+        + " in thread " + Thread.currentThread().getName());
+  }
+
+  /**
+   * Finalizer.
+   * <p>
+   * Verify that the inner stream is closed.
+   * <p>
+   * If it is not, it means streams are being leaked in application code.
+   * Log a warning, including the stack trace of the caller,
+   * then abort the stream.
+   * <p>
+   * This does not attempt to invoke {@link #close()} as that is
+   * a more complex operation, and this method is being executed
+   * during a GC finalization phase.
+   * <p>
+   * Applications MUST close their streams; this is a defensive
+   * operation to return http connections and warn the end users
+   * that their applications are at risk of running out of connections.
+   *
+   * {@inheritDoc}
+   */
+  @Override
+  @VisibleForTesting
+  public void finalize() throws Throwable {
+    if (isObjectStreamOpen()) {
+      // brute force stream close
+      closeStream("finalize()", true, true).get();
+      // log a warning with the creation stack
+      LEAK_LOG.warn(leakException.getMessage(), leakException);
+    }
+    super.finalize();
   }
 
   /**
@@ -710,7 +760,7 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
         forceAbort ? "abort" : "soft");
     boolean shouldAbort = forceAbort || remaining > readahead;
     CompletableFuture<Boolean> operation;
-    SDKStreamDrainer drainer = new SDKStreamDrainer(
+    SDKStreamDrainer<ResponseInputStream<GetObjectResponse>> drainer = new SDKStreamDrainer<>(
         uri,
         wrappedStream,
         shouldAbort,

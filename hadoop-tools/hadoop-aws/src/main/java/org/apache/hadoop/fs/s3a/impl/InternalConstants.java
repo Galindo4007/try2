@@ -301,4 +301,9 @@ public final class InternalConstants {
   public static final String UPLOAD_PROGRESS_LOG_NAME =
       "org.apache.hadoop.fs.s3a.S3AFileSystem.Progress";
 
+  /**
+   * Name of logger used to report HTTP connection leaks: {@value}.
+   */
+  public static final String CONNECTION_LEAKS_LOG_NAME= "org.apache.hadoop.fs.s3a.connection.leaks";
+
 }
