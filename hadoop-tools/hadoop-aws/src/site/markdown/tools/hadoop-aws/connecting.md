@@ -157,8 +157,8 @@ S3 Stores.
 The client is configured to create a pool of HTTP connections with S3, so that once
 the initial set of connections have been made they can re-used for followup operations.
 
-Core aspects of pool settings are
-* The pool size is set by `fs.s3a.connection.maximum` -if a process asks for more connections than this
+Core aspects of pool settings are:
+* The pool size is set by `fs.s3a.connection.maximum` -if a process asks for more connections than this then
   threads will be blocked until they are available.
 * The time blocked before an exception is raised is set in `fs.s3a.connection.acquisition.timeout`.
 * The time an idle connection will be kept in the pool is set by `fs.s3a.connection.idle.time`.
@@ -563,26 +563,34 @@ some of the main connectivity issues which cause problems.
 ### <a name="Not-enough-connections"></a> Connection pool overloaded
 
 If more connections are needed than the HTTP connection pool has,
-then worker threads will block until one is enabled.
+then worker threads will block until one is freed.
 
 If the wait exceeds the time set in `fs.s3a.connection.acquisition.timeout`,
 the operation will fail with `"Timeout waiting for connection from pool`.
 
 This may be retried, but time has been lost, which results in slower operations.
 If queries suddenly gets slower as the number of active operations increase,
-This is a possible cause.
+then this is a possible cause.
 
 Fixes:
 
 Increase the value of `fs.s3a.connection.maximum`.
-This is the general fix on query engines (Hive, Spark) which do not keep files open past the duration of a single task.
+This is the general fix on query engines such as Apache Spark, and Apache Impala
+which run many workers threads simultaneously, and do not keep files open past
+the duration of a single task within a larger query.
 
-Applications which keep files on, or simply open many files without closing them,
-may be leaking http connections due to keeping too many files open.
+It can also surface with applications which deliberately keep files open
+for extended periods.
+These should ideally call `unbuffer()` on the input streams.
+This will free up the connection until another read operation is invoked -yet
+still re-open faster than if `open(Path)` were invoked.
+
+Applications may also be "leaking" http connections by failing to
+close() them.
 This can only be fixed at a code level
-* Applications must call `close()` on an input stream when the contents of the file are longer needed.
-* If an input stream needs to be kept around for reuse, call `unbuffer()` on it.
-  This will free up the connection until another read operation is invoked.
+
+Applications MUST call `close()` on an input stream when the contents of
+the file are longer needed.
 
 ### <a name="inconsistent-config"></a> Inconsistent configuration across a cluster
 

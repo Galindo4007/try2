@@ -458,7 +458,6 @@ public final class Constants {
    */
   public static final boolean CONNECTION_EXPECT_CONTINUE_DEFAULT = true;
 
-
   // socket send buffer to be used in Amazon client
   public static final String SOCKET_SEND_BUFFER = "fs.s3a.socket.send.buffer";
   public static final int DEFAULT_SOCKET_SEND_BUFFER = 8 * 1024;
