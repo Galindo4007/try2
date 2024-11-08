@@ -33,6 +33,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
+import static org.apache.hadoop.test.GenericTestUtils.LogCapturer.captureLogs;
 
 /**
  * Specific lower-level tests on the input stream.
@@ -92,7 +93,7 @@ public class ITestS3AInputStream extends AbstractS3ATestBase {
 
         // Capture the logs
         GenericTestUtils.LogCapturer logs =
-            GenericTestUtils.LogCapturer.captureLogs(LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME));
+            captureLogs(LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME));
 
         LOG.info("captured log");
         // remove strong reference to the stream

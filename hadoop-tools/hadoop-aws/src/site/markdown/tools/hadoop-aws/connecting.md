@@ -485,6 +485,69 @@ If `storediag` doesn't connect to your S3 store, *nothing else will*.
 Based on the experience of people who field support calls, here are
 some of the main connectivity issues which cause problems.
 
+### <a name="Not-enough-connections"></a> Connection pool overloaded
+
+If more connections are needed than the HTTP connection pool has,
+then worker threads will block until one is freed.
+
+If the wait exceeds the time set in `fs.s3a.connection.acquisition.timeout`,
+the operation will fail with `"Timeout waiting for connection from pool`.
+
+This may be retried, but time has been lost, which results in slower operations.
+If queries suddenly gets slower as the number of active operations increase,
+then this is a possible cause.
+
+Fixes:
+
+Increase the value of `fs.s3a.connection.maximum`.
+This is the general fix on query engines such as Apache Spark, and Apache Impala
+which run many workers threads simultaneously, and do not keep files open past
+the duration of a single task within a larger query.
+
+It can also surface with applications which deliberately keep files open
+for extended periods.
+These should ideally call `unbuffer()` on the input streams.
+This will free up the connection until another read operation is invoked -yet
+still re-open faster than if `open(Path)` were invoked.
+
+Applications may also be "leaking" http connections by failing to
+close() them.
+This can only be fixed at a code level
+
+Applications MUST call `close()` on an input stream when the contents of
+the file are longer needed.
+
+To aid in identifying the location of these leaks, when a JVM garbage
+collection releases an unreferenced `S3AInputStream` instance,
+it will log at `WARN` level that it has not been closed,
+listing the filename, thread creating the file, and the stack trace
+of the `open()` call
+
+```
+[Finalizer] WARN  connection.leaks (S3AInputStream.java:finalize(292)) - HTTP connection not closed while reading
+   s3a://bucket/test/testFinalizer in thread JUnit-testFinalizer
+java.io.IOException: HTTP connection not closed while reading s3a://bucket/test/testFinalizer in thread JUnit-testFinalizer
+    at org.apache.hadoop.fs.s3a.S3AInputStream.<init>(S3AInputStream.java:263)
+    at org.apache.hadoop.fs.s3a.S3AFileSystem.executeOpen(S3AFileSystem.java:1890)
+    at org.apache.hadoop.fs.s3a.S3AFileSystem.open(S3AFileSystem.java:1840)
+    at org.apache.hadoop.fs.FileSystem.open(FileSystem.java:997)
+    at org.apache.hadoop.fs.s3a.ITestS3AInputStream.testFinalizer(ITestS3AInputStream.java:60)
+```
+
+It will also `abort()` the HTTP connection, freeing up space in the connection pool.
+This automated cleanup is _not_ a substitute for applications correctly closing
+input streams -it only happens during garbage collection, and this may not be
+rapid enough to prevent an application running out of connections.
+
+It is possible to stop these warning messages from being logged,
+by restricting the log `org.apache.hadoop.fs.s3a.connection.leaks` to
+only log at `ERROR` or above.
+
+
+```properties
+log4j.logger.org.apache.hadoop.fs.s3a.connection.leaks=ERROR
+```
+
 ### <a name="inconsistent-config"></a> Inconsistent configuration across a cluster
 
 All hosts in the cluster need to have the configuration secrets;

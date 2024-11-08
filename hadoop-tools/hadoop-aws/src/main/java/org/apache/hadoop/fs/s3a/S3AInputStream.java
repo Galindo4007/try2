@@ -283,8 +283,7 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
    * {@inheritDoc}
    */
   @Override
-  @VisibleForTesting
-  public void finalize() throws Throwable {
+  protected void finalize() throws Throwable {
     if (isObjectStreamOpen()) {
       // brute force stream close
       closeStream("finalize()", true, true).get();
