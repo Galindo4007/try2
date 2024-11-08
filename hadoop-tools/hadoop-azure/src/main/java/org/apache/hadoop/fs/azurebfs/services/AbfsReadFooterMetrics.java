@@ -349,6 +349,11 @@ public class AbfsReadFooterMetrics extends AbstractAbfsStatisticsSource {
                 .append("$RL=").append(String.format("%.3f", getMetricValue(fileType, READ_LEN_REQUESTED) / (double) readCount));
     }
 
+    /**
+     * Returns the read footer metrics for all file types.
+     *
+     * @return the read footer metrics as a string
+     */
     @Override
     public String toString() {
         StringBuilder readFooterMetric = new StringBuilder();
