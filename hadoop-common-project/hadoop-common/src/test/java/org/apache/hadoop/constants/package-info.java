@@ -16,20 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.constants;
-
 /**
  * Evolving config constants class used in various hadoop tests.
  */
-public final class ConfigConstants {
-
-  private ConfigConstants() {}
-
- /**
-  * System property name for the avro dependency.
-  * This property is used to configure trusted packages,
-  * which the avro dependency can use for serialization.
-  */
-  public static final String CONFIG_AVRO_SERIALIZABLE_PACKAGES =
-      "org.apache.avro.SERIALIZABLE_PACKAGES";
-}
+package org.apache.hadoop.constants;
