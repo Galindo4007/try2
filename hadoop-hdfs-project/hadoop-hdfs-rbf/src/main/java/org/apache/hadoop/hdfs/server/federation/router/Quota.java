@@ -56,11 +56,11 @@ public class Quota {
   private static final Logger LOG = LoggerFactory.getLogger(Quota.class);
 
   /** RPC server to receive client calls. */
-  private final RouterRpcServer rpcServer;
+  protected final RouterRpcServer rpcServer;
   /** RPC clients to connect to the Namenodes. */
-  private final RouterRpcClient rpcClient;
+  protected final RouterRpcClient rpcClient;
   /** Router used in RouterRpcServer. */
-  private final Router router;
+  protected final Router router;
 
   public Quota(Router router, RouterRpcServer server) {
     this.router = router;
@@ -215,7 +215,7 @@ public class Quota {
    * @return List of valid quota remote locations.
    * @throws IOException
    */
-  private List<RemoteLocation> getValidQuotaLocations(String path)
+  protected List<RemoteLocation> getValidQuotaLocations(String path)
       throws IOException {
     final List<RemoteLocation> locations = getQuotaRemoteLocations(path);
 
