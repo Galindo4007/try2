@@ -82,6 +82,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMServerUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.monitor.SchedulingMonitorManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
@@ -875,10 +876,9 @@ public abstract class AbstractYarnScheduler
       RMContainer rmContainer, ContainerStatus containerStatus,
       RMContainerEventType event) {
     N schedulerNode = getSchedulerNode(rmContainer.getNodeId());
-    if (schedulerNode != null &&
-        schedulerNode.getReservedContainer() != null) {
+    if (schedulerNode != null) {
       RMContainer resContainer = schedulerNode.getReservedContainer();
-      if (resContainer.getReservedSchedulerKey() != null) {
+      if (resContainer != null && resContainer.getReservedSchedulerKey() != null) {
         ContainerId containerToUpdate = resContainer
             .getReservedSchedulerKey().getContainerToUpdate();
         if (containerToUpdate != null &&
@@ -1679,7 +1679,8 @@ public abstract class AbstractYarnScheduler
   }
 
   @Override
-  public long checkAndGetApplicationLifetime(String queueName, long lifetime) {
+  public long checkAndGetApplicationLifetime(String queueName, long lifetime,
+                                             RMAppImpl app) {
     // Lifetime is the application lifetime by default.
     return lifetime;
   }

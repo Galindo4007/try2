@@ -399,6 +399,21 @@ public final class Constants {
       Duration.ofSeconds(60);
 
   /**
+   * Timeout for uploading all of a small object or a single part
+   * of a larger one.
+   * {@value}.
+   * Default unit is milliseconds for consistency with other options.
+   */
+  public static final String PART_UPLOAD_TIMEOUT =
+      "fs.s3a.connection.part.upload.timeout";
+
+  /**
+   * Default part upload timeout: 15 minutes.
+   */
+  public static final Duration DEFAULT_PART_UPLOAD_TIMEOUT =
+      Duration.ofMinutes(15);
+
+  /**
    * Should TCP Keepalive be enabled on the socket?
    * This adds some network IO, but finds failures faster.
    * {@value}.
@@ -1371,6 +1386,19 @@ public final class Constants {
    * through the getXAttr APIs have the prefix: {@value}.
    */
   public static final String XA_HEADER_PREFIX = "header.";
+
+  /**
+   * S3 cross region access enabled ?
+   * Value: {@value}.
+   */
+
+  public static final String AWS_S3_CROSS_REGION_ACCESS_ENABLED =
+      "fs.s3a.cross.region.access.enabled";
+  /**
+   * Default value for S3 cross region access enabled: {@value}.
+   */
+  public static final boolean AWS_S3_CROSS_REGION_ACCESS_ENABLED_DEFAULT = true;
+
 
   /**
    * AWS S3 region for the bucket. When set bypasses the construction of
