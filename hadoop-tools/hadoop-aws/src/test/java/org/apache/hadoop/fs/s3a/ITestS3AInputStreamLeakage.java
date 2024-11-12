@@ -36,9 +36,9 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 import static org.apache.hadoop.test.GenericTestUtils.LogCapturer.captureLogs;
 
 /**
- * Specific lower-level tests on the input stream.
+ *  Test Stream leakage.
  */
-public class ITestS3AInputStream extends AbstractS3ATestBase {
+public class ITestS3AInputStreamLeakage extends AbstractS3ATestBase {
 
   /**
    * How big a file to create?

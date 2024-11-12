@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.IntFunction;
@@ -39,6 +40,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.hadoop.fs.impl.LeakReporter;
 import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -69,7 +71,6 @@ import static org.apache.hadoop.fs.VectoredReadUtils.isOrderedDisjoint;
 import static org.apache.hadoop.fs.VectoredReadUtils.mergeSortedRanges;
 import static org.apache.hadoop.fs.VectoredReadUtils.validateAndSortRanges;
 import static org.apache.hadoop.fs.s3a.Invoker.onceTrackingDuration;
-import static org.apache.hadoop.fs.s3a.impl.InternalConstants.CONNECTION_LEAKS_LOG_NAME;
 import static org.apache.hadoop.util.StringUtils.toLowerCase;
 import static org.apache.hadoop.util.functional.FutureIO.awaitFuture;
 
@@ -119,12 +120,6 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
 
   private static final Logger LOG =
       LoggerFactory.getLogger(S3AInputStream.class);
-
-  /**
-   * Special log for leaked streams.
-   */
-  private static final Logger LEAK_LOG =
-      LoggerFactory.getLogger(CONNECTION_LEAKS_LOG_NAME);
 
   /**
    * Atomic boolean variable to stop all ongoing vectored read operation
@@ -212,10 +207,10 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
   private final IOStatisticsAggregator threadIOStatistics;
 
   /**
-   * Stack trace of object creation; used to
-   * report of unclosed streams in finalize().
+   * Report of leaks.
+   * with report and abort unclosed streams in finalize().
    */
-  private final IOException leakException;
+  private final LeakReporter leakReporter;
 
   /**
    * Create the stream.
@@ -257,10 +252,11 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
     this.boundedThreadPool = boundedThreadPool;
     this.vectoredIOContext = context.getVectoredIOContext();
     this.threadIOStatistics = requireNonNull(ctx.getIOStatisticsAggregator());
-    // build the warning thread. This is the error string to print, so as to avoid
-    // constructing objects in finalize().
-    this.leakException = new IOException("HTTP connection not closed while reading " + uri
-        + " in thread " + Thread.currentThread().getName());
+    // build the leak reporter
+    this.leakReporter = new LeakReporter(
+        "Stream not closed while reading " + uri,
+        this::isStreamOpen,
+        () -> abortInFinalizer());
   }
 
   /**
@@ -284,13 +280,29 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
    */
   @Override
   protected void finalize() throws Throwable {
-    if (isObjectStreamOpen()) {
-      // brute force stream close
-      closeStream("finalize()", true, true).get();
-      // log a warning with the creation stack
-      LEAK_LOG.warn(leakException.getMessage(), leakException);
-    }
+    leakReporter.close();
     super.finalize();
+  }
+
+  /**
+   * Probe for stream being open.
+   * Not synchronized; the flag is volatile.
+   * @return true if the stream is still open.
+   */
+  private boolean isStreamOpen() {
+    return !closed;
+  }
+
+  /**
+   * Brute force stream close.
+   * All exceptions raised are ignored.
+   */
+  private void abortInFinalizer() {
+    try {
+      closeStream("finalize()", true, true).get();
+    } catch (InterruptedException | ExecutionException ignroed) {
+      /* ignore this failure shutdown */
+    }
   }
 
   /**

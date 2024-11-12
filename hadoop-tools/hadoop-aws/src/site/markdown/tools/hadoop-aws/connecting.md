@@ -524,14 +524,15 @@ listing the filename, thread creating the file, and the stack trace
 of the `open()` call
 
 ```
-[Finalizer] WARN  connection.leaks (S3AInputStream.java:finalize(292)) - HTTP connection not closed while reading
-   s3a://bucket/test/testFinalizer in thread JUnit-testFinalizer
-java.io.IOException: HTTP connection not closed while reading s3a://bucket/test/testFinalizer in thread JUnit-testFinalizer
-    at org.apache.hadoop.fs.s3a.S3AInputStream.<init>(S3AInputStream.java:263)
+2024-11-12 15:08:56,410 [Finalizer] WARN  resource.leaks (LeakReporter.java:close(104))
+ - Stream not closed while reading s3a://bucket/test/testFinalizer; thread: JUnit-testFinalizer
+java.io.IOException: Stream not closed while reading s3a://bucket/test/testFinalizer; thread: JUnit-testFinalizer
+    at org.apache.hadoop.fs.impl.LeakReporter.<init>(LeakReporter.java:93)
+    at org.apache.hadoop.fs.s3a.S3AInputStream.<init>(S3AInputStream.java:256)
     at org.apache.hadoop.fs.s3a.S3AFileSystem.executeOpen(S3AFileSystem.java:1890)
     at org.apache.hadoop.fs.s3a.S3AFileSystem.open(S3AFileSystem.java:1840)
     at org.apache.hadoop.fs.FileSystem.open(FileSystem.java:997)
-    at org.apache.hadoop.fs.s3a.ITestS3AInputStream.testFinalizer(ITestS3AInputStream.java:60)
+    at org.apache.hadoop.fs.s3a.ITestS3AInputStreamLeakage.testFinalizer(ITestS3AInputStreamLeakage.java:79)
 ```
 
 It will also `abort()` the HTTP connection, freeing up space in the connection pool.
@@ -540,8 +541,10 @@ input streams -it only happens during garbage collection, and this may not be
 rapid enough to prevent an application running out of connections.
 
 It is possible to stop these warning messages from being logged,
-by restricting the log `org.apache.hadoop.fs.s3a.connection.leaks` to
+by restricting the log `org.apache.hadoop.fs.resource.leaks` to
 only log at `ERROR` or above.
+This will also disable error logging for all other resources whose leakes
+are tracked.
 
 
 ```properties
