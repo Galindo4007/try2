@@ -41,6 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.fs.impl.LeakReporter;
+import org.apache.hadoop.fs.statistics.StreamStatisticNames;
 import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -294,11 +295,14 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
   }
 
   /**
-   * Brute force stream close.
+   * Brute force stream close; invoked by {@link LeakReporter}.
    * All exceptions raised are ignored.
    */
   private void abortInFinalizer() {
     try {
+      // stream was leaked: update statistic
+      streamStatistics.streamLeaked();
+      // abort the stream. This merges statistics into the filesystem.
       closeStream("finalize()", true, true).get();
     } catch (InterruptedException | ExecutionException ignroed) {
       /* ignore this failure shutdown */
@@ -1418,6 +1422,7 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
     switch (toLowerCase(capability)) {
     case StreamCapabilities.IOSTATISTICS:
     case StreamCapabilities.IOSTATISTICS_CONTEXT:
+    case StreamStatisticNames.STREAM_LEAKS:
     case StreamCapabilities.READAHEAD:
     case StreamCapabilities.UNBUFFER:
     case StreamCapabilities.VECTOREDIO:

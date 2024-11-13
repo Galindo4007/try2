@@ -37,7 +37,6 @@ package org.apache.hadoop.fs.impl;/*
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.assertj.core.api.Assertions;
-import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.test.AbstractHadoopTestBase;
 import org.apache.hadoop.test.GenericTestUtils;
 
+import static org.apache.hadoop.fs.impl.LeakReporter.THREAD_FORMAT;
 import static org.apache.hadoop.test.GenericTestUtils.LogCapturer.captureLogs;
 
 public final class TestLeakReporter extends AbstractHadoopTestBase {
@@ -56,11 +56,6 @@ public final class TestLeakReporter extends AbstractHadoopTestBase {
    * Count of close calls.
    */
   private final AtomicInteger closeCount = new AtomicInteger();
-
-  @Before
-  public void setup() throws Exception {
-    closeCount.set(0);
-  }
 
   /**
    * Big test: creates a reporter, closes it.
@@ -91,14 +86,19 @@ public final class TestLeakReporter extends AbstractHadoopTestBase {
     final String output = logs.getOutput();
     LOG.info("output of leak log is {}", output);
 
+    final String threadInfo = String.format(THREAD_FORMAT,
+        oldName,
+        Thread.currentThread().getId());
     // log auditing
     Assertions.assertThat(output)
         .describedAs("output from the logs")
+        .contains("WARN")
         .contains(message)
         .contains(Thread.currentThread().getName())
-        .contains(oldName)
-        .contains("TestLeakReporter.testLeakInvocation");
-
+        .contains(threadInfo)
+        .contains("TestLeakReporter.testLeakInvocation")
+        .contains("INFO")
+        .contains("stack");
 
     // no reentrancy
     expectClose(reporter, 1);
@@ -134,14 +134,21 @@ public final class TestLeakReporter extends AbstractHadoopTestBase {
     expectClose(reporter, 0);
   }
 
+  /**
+   * If the probe raises an exception, the exception is swallowed
+   * and the close action is never invoked.
+   */
   @Test
   public void testProbeFailureSwallowed() throws Throwable {
     final LeakReporter reporter = new LeakReporter("<message>",
         this::raiseNPE,
         this::closed);
-    expectClose(reporter, 1);
+    expectClose(reporter, 0);
   }
 
+  /**
+   * Any exception raised in the close action it is swallowed.
+   */
   @Test
   public void testCloseActionSwallowed() throws Throwable {
     final LeakReporter reporter = new LeakReporter("<message>",
@@ -150,8 +157,8 @@ public final class TestLeakReporter extends AbstractHadoopTestBase {
     reporter.close();
 
     Assertions.assertThat(reporter.isClosed())
-        .describedAs("reporter closed)").
-        isTrue();
+        .describedAs("reporter closed)")
+        .isTrue();
   }
 
   /**

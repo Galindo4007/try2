@@ -511,28 +511,34 @@ This will free up the connection until another read operation is invoked -yet
 still re-open faster than if `open(Path)` were invoked.
 
 Applications may also be "leaking" http connections by failing to
-close() them.
-This can only be fixed at a code level
+`close()` them. This is potentially fatal as eventually the connection pool
+can get exhausted -at which point the program will no longer work.
 
-Applications MUST call `close()` on an input stream when the contents of
-the file are longer needed.
+This can only be fixed in the application code: it is _not_ a bug in
+the S3A filesystem.
+
+1. Applications MUST call `close()` on an input stream when the contents of
+   the file are longer needed.
+2. If long-lived applications eventually fail with unrecoverable
+   `ApiCallTimeout` exceptions, they are not doing so.
 
 To aid in identifying the location of these leaks, when a JVM garbage
 collection releases an unreferenced `S3AInputStream` instance,
 it will log at `WARN` level that it has not been closed,
-listing the filename, thread creating the file, and the stack trace
-of the `open()` call
+listing the file URL, and the thread name + ID of the the thread
+which creating the file.
+The the stack trace of the `open()` call will be logged at `INFO`
 
 ```
-2024-11-12 15:08:56,410 [Finalizer] WARN  resource.leaks (LeakReporter.java:close(104))
- - Stream not closed while reading s3a://bucket/test/testFinalizer; thread: JUnit-testFinalizer
-java.io.IOException: Stream not closed while reading s3a://bucket/test/testFinalizer; thread: JUnit-testFinalizer
-    at org.apache.hadoop.fs.impl.LeakReporter.<init>(LeakReporter.java:93)
-    at org.apache.hadoop.fs.s3a.S3AInputStream.<init>(S3AInputStream.java:256)
-    at org.apache.hadoop.fs.s3a.S3AFileSystem.executeOpen(S3AFileSystem.java:1890)
-    at org.apache.hadoop.fs.s3a.S3AFileSystem.open(S3AFileSystem.java:1840)
+2024-11-13 12:48:24,537 [Finalizer] WARN  resource.leaks (LeakReporter.java:close(114)) - Stream not closed while reading s3a://bucket/test/testFinalizer; thread: JUnit-testFinalizer; id: 11
+2024-11-13 12:48:24,537 [Finalizer] INFO  resource.leaks (LeakReporter.java:close(120)) - stack
+java.io.IOException: Stream not closed while reading s3a://bucket/test/testFinalizer; thread: JUnit-testFinalizer; id: 11
+    at org.apache.hadoop.fs.impl.LeakReporter.<init>(LeakReporter.java:101)
+    at org.apache.hadoop.fs.s3a.S3AInputStream.<init>(S3AInputStream.java:257)
+    at org.apache.hadoop.fs.s3a.S3AFileSystem.executeOpen(S3AFileSystem.java:1891)
+    at org.apache.hadoop.fs.s3a.S3AFileSystem.open(S3AFileSystem.java:1841)
     at org.apache.hadoop.fs.FileSystem.open(FileSystem.java:997)
-    at org.apache.hadoop.fs.s3a.ITestS3AInputStreamLeakage.testFinalizer(ITestS3AInputStreamLeakage.java:79)
+    at org.apache.hadoop.fs.s3a.ITestS3AInputStreamLeakage.testFinalizer(ITestS3AInputStreamLeakage.java:99)
 ```
 
 It will also `abort()` the HTTP connection, freeing up space in the connection pool.
@@ -543,13 +549,25 @@ rapid enough to prevent an application running out of connections.
 It is possible to stop these warning messages from being logged,
 by restricting the log `org.apache.hadoop.fs.resource.leaks` to
 only log at `ERROR` or above.
-This will also disable error logging for all other resources whose leakes
-are tracked.
-
+This will also disable error logging for _all other resources whose leaks
+are detected.
 
 ```properties
 log4j.logger.org.apache.hadoop.fs.s3a.connection.leaks=ERROR
 ```
+
+To disable stack traces without the URI/thread information, set the log level to `WARN`
+
+```properties
+log4j.logger.org.apache.hadoop.fs.s3a.connection.leaks=WARN
+```
+
+This is better for production deployments: leakages are reported but
+stack traces only of relevance to the application developers are
+omitted.
+
+Finally, note that the filesystem and thread context IOStatistic `stream_leaks"` is updated;
+if these statistics are collected then the existence of leakages can be detected.
 
 ### <a name="inconsistent-config"></a> Inconsistent configuration across a cluster
 

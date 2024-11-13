@@ -26,6 +26,7 @@ import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.util.functional.RunnableRaisingIOE;
 
 import static java.util.Objects.requireNonNull;
@@ -50,6 +51,13 @@ public class LeakReporter implements Closeable {
    */
   private static final Logger LEAK_LOG =
       LoggerFactory.getLogger(RESOURCE_LEAKS_LOG_NAME);
+
+  /**
+   * Format string used to build the thread information: {@value}.
+   */
+  @VisibleForTesting
+  static final String THREAD_FORMAT =
+      "; thread: %s; id: %d";
 
   /**
    * Re-entrancy check.
@@ -91,7 +99,9 @@ public class LeakReporter implements Closeable {
     // This includes the error string to print, so as to avoid
     // constructing objects in finalize().
     this.leakException = new IOException(message
-        + "; thread: " + Thread.currentThread().getName());
+        + String.format(THREAD_FORMAT,
+        Thread.currentThread().getName(),
+        Thread.currentThread().getId()));
   }
 
   /**
@@ -102,7 +112,13 @@ public class LeakReporter implements Closeable {
     try {
       if (!closed.getAndSet(true) && isOpen.getAsBoolean()) {
         // log a warning with the creation stack
-        LEAK_LOG.warn(leakException.getMessage(), leakException);
+        LEAK_LOG.warn(leakException.getMessage());
+        // The creation stack is logged at INFO, so that
+        // it is possible to configure logging to print
+        // the name of files left open, without printing
+        // the stacks. This is better for production use.
+
+        LEAK_LOG.info("stack", leakException);
         closeAction.apply();
       }
     } catch (Exception e) {
