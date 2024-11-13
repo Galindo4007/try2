@@ -57,6 +57,7 @@ import org.apache.hadoop.hdfs.security.token.block.BlockPoolTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
 import org.apache.hadoop.hdfs.server.datanode.DNConf;
+import org.apache.hadoop.security.CustomizedCallbackHandler;
 import org.apache.hadoop.security.SaslPropertiesResolver;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -224,21 +225,8 @@ public class SaslDataTransferServer {
      */
     SaslServerCallbackHandler(Configuration conf, PasswordFunction passwordFunction) {
       this.passwordFunction = passwordFunction;
-
-      final Class<?> clazz = conf.getClass(
-          HdfsClientConfigKeys.DFS_DATA_TRANSFER_SASL_CUSTOMIZEDCALLBACKHANDLER_CLASS_KEY,
-          CustomizedCallbackHandler.DefaultHandler.class);
-      final Object callbackHandler;
-      try {
-        callbackHandler = clazz.newInstance();
-      } catch (Exception e) {
-        throw new IllegalStateException("Failed to create a new instance of " + clazz, e);
-      }
-      if (callbackHandler instanceof CustomizedCallbackHandler) {
-        customizedCallbackHandler = (CustomizedCallbackHandler) callbackHandler;
-      } else {
-        customizedCallbackHandler = CustomizedCallbackHandler.delegate(callbackHandler);
-      }
+      this.customizedCallbackHandler = CustomizedCallbackHandler.get(
+          HdfsClientConfigKeys.DFS_DATA_TRANSFER_SASL_CUSTOMIZEDCALLBACKHANDLER_CLASS_KEY, conf);
     }
 
     @Override
