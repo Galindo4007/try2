@@ -1212,7 +1212,7 @@ public class TestBalancer {
     doTest(conf, new long[]{CAPACITY, CAPACITY}, new String[]{RACK0, RACK1},
         CAPACITY, RACK2, null, false, false, false, 0.3, null);
   }
-  
+
   private void testBalancerDefaultConstructor(Configuration conf,
       long[] capacities, String[] racks, long newCapacity, String newRack)
       throws Exception {
