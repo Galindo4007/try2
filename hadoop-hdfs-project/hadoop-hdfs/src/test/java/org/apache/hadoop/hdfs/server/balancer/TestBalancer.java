@@ -1203,7 +1203,7 @@ public class TestBalancer {
         new String[]{RACK0, RACK1}, CAPACITY, RACK2);
   }
 
-  /** Test a cluster with even distribution,
+  /** Test a cluster with an even distribution,
    * then a new node with nonDfsUsed is added to the cluster. */
   @Test(timeout=100000)
   public void testBalancer3() throws Exception {
