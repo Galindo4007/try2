@@ -30,7 +30,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 /**
  * SASL related constants.
  */
-@InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
+@InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce", "YARN", "HBase"})
 @InterfaceStability.Evolving
 public final class SaslMechanismFactory {
   static final Logger LOG = LoggerFactory.getLogger(SaslMechanismFactory.class);
@@ -44,7 +44,7 @@ public final class SaslMechanismFactory {
     LOG.debug("{} = {} (env)", SASL_MECHANISM_ENV, envValue);
 
     // conf
-    final Configuration conf = new Configuration();
+    final Configuration conf = new Configuration(false);
     final String confValue = conf.get(HADOOP_SECURITY_SASL_MECHANISM_KEY,
         HADOOP_SECURITY_SASL_MECHANISM_DEFAULT);
     LOG.debug("{} = {} (conf)", HADOOP_SECURITY_SASL_MECHANISM_KEY, confValue);

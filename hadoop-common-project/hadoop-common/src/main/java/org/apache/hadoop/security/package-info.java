@@ -19,4 +19,7 @@
 /**
  * Classes for hadoop security.
  */
+@InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce", "YARN", "HBase"})
 package org.apache.hadoop.security;
+
+import org.apache.hadoop.classification.InterfaceAudience;

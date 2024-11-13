@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.protocol.datatransfer.sasl;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferServer.SaslServerCallbackHandler;
 import org.apache.hadoop.security.CustomizedCallbackHandler;
 import org.apache.hadoop.security.SaslRpcServer;
@@ -82,7 +81,7 @@ public class TestCustomizedCallbackHandler {
 
     // set conf and expect success
     reset();
-    conf.setClass(HdfsClientConfigKeys.DFS_DATA_TRANSFER_SASL_CUSTOMIZEDCALLBACKHANDLER_CLASS_KEY,
+    conf.setClass(HADOOP_SECURITY_SASL_CUSTOMIZEDCALLBACKHANDLER_CLASS_KEY,
         MyCallbackHandler.class, CustomizedCallbackHandler.class);
     runTest(conf, callbacks);
     assertCallbacks(callbacks);
@@ -120,14 +119,14 @@ public class TestCustomizedCallbackHandler {
 
     // set conf and expect success
     reset();
-    conf.setClass(HdfsClientConfigKeys.DFS_DATA_TRANSFER_SASL_CUSTOMIZEDCALLBACKHANDLER_CLASS_KEY,
+    conf.setClass(HADOOP_SECURITY_SASL_CUSTOMIZEDCALLBACKHANDLER_CLASS_KEY,
         MyCallbackMethod.class, Object.class);
     runTest(conf, callbacks);
     assertCallbacks(callbacks);
 
     // set conf and expect exception
     reset();
-    conf.setClass(HdfsClientConfigKeys.DFS_DATA_TRANSFER_SASL_CUSTOMIZEDCALLBACKHANDLER_CLASS_KEY,
+    conf.setClass(HADOOP_SECURITY_SASL_CUSTOMIZEDCALLBACKHANDLER_CLASS_KEY,
         MyExceptionMethod.class, Object.class);
     LambdaTestUtils.intercept(IOException.class, () -> runTest(conf, callbacks));
   }
