@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.CompletionException;
 
 import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncApply;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncComplete;
 import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncReturn;
 
 public class AsyncQuota extends Quota {
@@ -48,7 +47,7 @@ public class AsyncQuota extends Quota {
     asyncApply(o -> {
       Map<RemoteLocation, QuotaUsage> results = (Map<RemoteLocation, QuotaUsage>) o;
       try {
-        return AsyncQuota.super.aggregateQuota(path, results);
+        return aggregateQuota(path, results);
       } catch (IOException e) {
         throw new CompletionException(e);
       }

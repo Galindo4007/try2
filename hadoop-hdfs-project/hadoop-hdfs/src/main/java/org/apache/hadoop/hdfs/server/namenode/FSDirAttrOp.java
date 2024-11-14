@@ -342,7 +342,7 @@ public class FSDirAttrOp {
     if ((type != null) && (!fsd.isQuotaByStorageTypeEnabled() ||
         nsQuota != HdfsConstants.QUOTA_DONT_SET)) {
       throw new UnsupportedActionException(
-          "Failed to set quota by storage type because either" +
+          "Failed to set quota by storage type because either " +
           DFS_QUOTA_BY_STORAGETYPE_ENABLED_KEY + " is set to " +
           fsd.isQuotaByStorageTypeEnabled() + " or nsQuota value is illegal " +
           nsQuota);
