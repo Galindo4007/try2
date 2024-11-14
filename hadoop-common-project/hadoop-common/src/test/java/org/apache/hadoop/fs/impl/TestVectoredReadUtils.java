@@ -27,6 +27,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.IntFunction;
 
 import org.assertj.core.api.Assertions;
@@ -40,6 +41,7 @@ import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.PositionedReadable;
 import org.apache.hadoop.fs.VectoredReadUtils;
+import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.test.HadoopTestBase;
 
 import static java.util.Arrays.asList;
@@ -822,5 +824,50 @@ public class TestVectoredReadUtils extends HadoopTestBase {
         validateAndSortRanges(
             asList(createFileRange(length - 1, 2)),
             Optional.of(length)));
+  }
+
+  @Test
+  public void testVectorIOBufferPool() throws Throwable {
+    ElasticByteBufferPool elasticByteBufferPool = new ElasticByteBufferPool();
+
+    // inlined lambda to assert the pool size
+    Consumer<Integer> assertPoolSize = (size) -> {
+      Assertions.assertThat(elasticByteBufferPool.size(false))
+          .describedAs("Pool size")
+          .isEqualTo(size);
+    };
+
+    // build vector pool from the buffer pool operations converted to
+    // allocate and release lambda expressions
+    VectorIOBufferPool vectorBuffers = new VectorIOBufferPool(
+        r -> elasticByteBufferPool.getBuffer(false, r),
+        elasticByteBufferPool::putBuffer);
+
+    assertPoolSize.accept(0);
+
+    final ByteBuffer b1 = vectorBuffers.getBuffer(false, 100);
+    final ByteBuffer b2 = vectorBuffers.getBuffer(false, 50);
+
+    // return the first buffer for a pool size of 1
+    vectorBuffers.putBuffer(b1);
+    assertPoolSize.accept(1);
+
+    // expect the returned buffer back
+    ByteBuffer b3 = vectorBuffers.getBuffer(true, 100);
+    Assertions.assertThat(b3)
+        .describedAs("buffer returned from a get after a previous one was returned")
+        .isSameAs(b1);
+    assertPoolSize.accept(0);
+
+    // return them all
+    vectorBuffers.putBuffer(b2);
+    vectorBuffers.putBuffer(b3);
+    assertPoolSize.accept(2);
+
+    // release does not propagate
+    vectorBuffers.release();
+    assertPoolSize.accept(2);
+
+    elasticByteBufferPool.release();
   }
 }
