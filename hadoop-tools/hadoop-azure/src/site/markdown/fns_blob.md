@@ -70,9 +70,9 @@ to blob for HNS Enabled Accounts, FS init will fail with InvalidConfiguration er
     ```
 
 4. Service Type for Ingress Operations: This will allow an override to choose service
-type only for Ingress Related Operations like [Create](https://learn.microsoft.com/en-us/rest/api/storageservices/put-blob?tabs=microsoft-entra-id),
-[Append](https://learn.microsoft.com/en-us/rest/api/storageservices/put-block?tabs=microsoft-entra-id)
-and [Flush](https://learn.microsoft.com/en-us/rest/api/storageservices/put-block-list?tabs=microsoft-entra-id). All other operations will still use the
+type only for Ingress Related Operations like [Create](./blobEndpoint.html#put-blob),
+[Append](./blobEndpoint.html#put-block),
+and [Flush](./blobEndpoint.html#put-block-list). All other operations will still use the
 configured service type.
     ```xml
    <property>
