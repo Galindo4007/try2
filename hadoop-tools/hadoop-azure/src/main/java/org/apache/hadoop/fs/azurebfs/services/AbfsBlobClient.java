@@ -277,7 +277,7 @@ public class AbfsBlobClient extends AbfsClient {
       final int listMaxResults,
       final String continuation,
       TracingContext tracingContext) throws AzureBlobFileSystemException {
-    // Todo: [FnsOverBlob] To be implemented as part of response handling of blob endpoint APIs. <a href="https://issues.apache.org/jira/browse/HADOOP-19207">HADOOP-19207</a>.
+    // TODO: [FnsOverBlob][HADOOP-19207] To be implemented as part of response handling of blob endpoint APIs.
     throw new NotImplementedException("Blob Endpoint Support is not yet implemented");
   }
 
@@ -299,7 +299,7 @@ public class AbfsBlobClient extends AbfsClient {
       final String eTag,
       final ContextEncryptionAdapter contextEncryptionAdapter,
       final TracingContext tracingContext) throws AzureBlobFileSystemException {
-    // Todo: [FnsOverBlob] To be implemented as part of ingress work over blob endpoint. <a href="https://issues.apache.org/jira/browse/HADOOP-19232">HADOOP-19232</a>.
+    // TODO: [FnsOverBlob][HADOOP-19207] To be implemented as part of response handling of blob endpoint APIs.
     throw new NotImplementedException("Create Path operation on Blob endpoint yet to be implemented.");
   }
 
@@ -433,7 +433,7 @@ public class AbfsBlobClient extends AbfsClient {
       final boolean isMetadataIncompleteState,
       final boolean isNamespaceEnabled) throws IOException {
     /**
-     * Todo: [FnsOverBlob] To be implemented as part of rename-delete over blob endpoint work. <a href="https://issues.apache.org/jira/browse/HADOOP-19233">HADOOP-19233</a>.
+     * TODO: [FnsOverBlob] To be implemented as part of rename-delete over blob endpoint work. <a href="https://issues.apache.org/jira/browse/HADOOP-19233">HADOOP-19233</a>.
      */
     throw new NotImplementedException("Rename operation on Blob endpoint yet to be implemented.");
   }
@@ -730,7 +730,7 @@ public class AbfsBlobClient extends AbfsClient {
       }
       if (op.getResult().getStatusCode() == HTTP_NOT_FOUND && isImplicitCheckRequired) {
         // This path could be present as an implicit directory in FNS.
-        // Todo: [FnsOverBlob] To be implemented as part of implicit directory handling over blob endpoint. <a href="https://issues.apache.org/jira/browse/HADOOP-19207">HADOOP-19207</a>.
+        // TODO: [FnsOverBlob][HADOOP-19207] To be implemented as part of implicit directory handling over blob endpoint.
       }
       if (op.getResult().getStatusCode() == HTTP_NOT_FOUND) {
         /*
@@ -820,7 +820,7 @@ public class AbfsBlobClient extends AbfsClient {
       final String continuation,
       TracingContext tracingContext,
       final boolean isNamespaceEnabled) throws AzureBlobFileSystemException {
-    // Todo: [FnsOverBlob] To be implemented as part of rename-delete over blob endpoint work. <a href="https://issues.apache.org/jira/browse/HADOOP-19233">HADOOP-19233</a>.
+    // TODO: [FnsOverBlob][HADOOP-19233] To be implemented as part of rename-delete over blob endpoint work.
     throw new NotImplementedException("Delete operation on Blob endpoint will be implemented in future.");
   }
 
