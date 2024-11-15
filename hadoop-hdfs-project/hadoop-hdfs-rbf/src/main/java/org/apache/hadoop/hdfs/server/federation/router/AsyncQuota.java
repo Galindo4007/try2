@@ -31,8 +31,17 @@ import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.as
 
 public class AsyncQuota extends Quota {
 
+  /** RPC server to receive client calls. */
+  private final RouterRpcServer rpcServer;
+  /** RPC clients to connect to the Namenodes. */
+  private final RouterRpcClient rpcClient;
+  private final Router router;
+  
   public AsyncQuota(Router router, RouterRpcServer server) {
     super(router, server);
+    this.router = router;
+    this.rpcServer = server;
+    this.rpcClient =  this.rpcServer.getRPCClient();
   }
 
   /**

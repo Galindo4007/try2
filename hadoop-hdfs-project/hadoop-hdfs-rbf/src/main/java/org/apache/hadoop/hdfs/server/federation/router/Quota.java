@@ -56,11 +56,11 @@ public class Quota {
   private static final Logger LOG = LoggerFactory.getLogger(Quota.class);
 
   /** RPC server to receive client calls. */
-  protected final RouterRpcServer rpcServer;
+  private final RouterRpcServer rpcServer;
   /** RPC clients to connect to the Namenodes. */
-  protected final RouterRpcClient rpcClient;
+  private final RouterRpcClient rpcClient;
   /** Router used in RouterRpcServer. */
-  protected final Router router;
+  private final Router router;
 
   public Quota(Router router, RouterRpcServer server) {
     this.router = router;
