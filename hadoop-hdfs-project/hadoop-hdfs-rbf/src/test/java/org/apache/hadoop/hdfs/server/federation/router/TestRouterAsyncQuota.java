@@ -151,10 +151,10 @@ public class TestRouterAsyncQuota {
     QuotaUsage quotaUsage = syncReturn(QuotaUsage.class);
     // 3-replication.
     Assert.assertEquals(3 * 1024, quotaUsage.getSpaceConsumed());
-    // We have one directory and one file. 
+    // We have one directory and one file.
     Assert.assertEquals(2, quotaUsage.getFileAndDirectoryCount());
   }
-  
+
   @Test
   public void testRouterAsyncSetQuotaUsage() throws Exception {
     asyncQuota.setQuota("/testdir", Long.MAX_VALUE, 8096, StorageType.DISK, false);
