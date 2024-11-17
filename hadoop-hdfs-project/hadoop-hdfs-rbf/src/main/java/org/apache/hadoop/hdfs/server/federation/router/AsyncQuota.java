@@ -36,7 +36,7 @@ public class AsyncQuota extends Quota {
   /** RPC clients to connect to the Namenodes. */
   private final RouterRpcClient rpcClient;
   private final Router router;
-  
+
   public AsyncQuota(Router router, RouterRpcServer server) {
     super(router, server);
     this.router = router;
