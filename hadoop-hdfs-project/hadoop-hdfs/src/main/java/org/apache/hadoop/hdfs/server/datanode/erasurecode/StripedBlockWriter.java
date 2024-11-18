@@ -32,8 +32,8 @@ import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataEncryptionKeyFactor
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.io.ByteBufferPool;
-import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.io.WeakReferencedElasticByteBufferPool;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.token.Token;
 
@@ -69,7 +69,7 @@ class StripedBlockWriter {
   private ByteBuffer targetBuffer;
   private long blockOffset4Target = 0;
   private long seqNo4Target = 0;
-  private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
+  private static final ByteBufferPool BUFFER_POOL = new WeakReferencedElasticByteBufferPool();
 
   StripedBlockWriter(StripedWriter stripedWriter, DataNode datanode,
                      Configuration conf, ExtendedBlock block,

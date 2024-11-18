@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.fs.impl.StoreImplementationUtils;
 import org.apache.hadoop.classification.VisibleForTesting;
+import org.apache.hadoop.io.WeakReferencedElasticByteBufferPool;
 import org.apache.hadoop.util.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 
@@ -239,7 +240,7 @@ public class BlockBlobAppendStream extends OutputStream implements Syncable,
    * back to the queue
    */
   private final ElasticByteBufferPool poolReadyByteBuffers
-          = new ElasticByteBufferPool();
+          = new WeakReferencedElasticByteBufferPool();
 
   /**
    * The blob's block list.

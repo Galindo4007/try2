@@ -37,8 +37,8 @@ import org.apache.hadoop.hdfs.protocol.LocatedStripedBlock;
 import org.apache.hadoop.hdfs.protocol.datatransfer.BlockConstructionStage;
 import org.apache.hadoop.hdfs.util.StripedBlockUtil;
 import org.apache.hadoop.io.ByteBufferPool;
-import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.io.MultipleIOException;
+import org.apache.hadoop.io.WeakReferencedElasticByteBufferPool;
 import org.apache.hadoop.io.erasurecode.CodecUtil;
 import org.apache.hadoop.io.erasurecode.ErasureCoderOptions;
 import org.apache.hadoop.io.erasurecode.rawcoder.RawErasureEncoder;
@@ -83,7 +83,7 @@ import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.Write.RECOVER_L
 @InterfaceAudience.Private
 public class DFSStripedOutputStream extends DFSOutputStream
     implements StreamCapabilities {
-  private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
+  private static final ByteBufferPool BUFFER_POOL = new WeakReferencedElasticByteBufferPool();
 
   /**
    * OutputStream level last exception, will be used to indicate the fatal

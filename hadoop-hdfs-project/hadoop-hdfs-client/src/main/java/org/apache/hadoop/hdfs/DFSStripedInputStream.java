@@ -36,7 +36,7 @@ import org.apache.hadoop.hdfs.util.StripedBlockUtil.AlignedStripe;
 import org.apache.hadoop.hdfs.util.StripedBlockUtil.StripeRange;
 import org.apache.hadoop.io.ByteBufferPool;
 
-import org.apache.hadoop.io.ElasticByteBufferPool;
+import org.apache.hadoop.io.WeakReferencedElasticByteBufferPool;
 import org.apache.hadoop.io.erasurecode.CodecUtil;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
 
@@ -64,7 +64,7 @@ import static org.apache.hadoop.hdfs.util.IOUtilsClient.updateReadStatistics;
 @InterfaceAudience.Private
 public class DFSStripedInputStream extends DFSInputStream {
 
-  private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
+  private static final ByteBufferPool BUFFER_POOL = new WeakReferencedElasticByteBufferPool();
   private final BlockReaderInfo[] blockReaders;
   private final int cellSize;
   private final short dataBlkNum;
