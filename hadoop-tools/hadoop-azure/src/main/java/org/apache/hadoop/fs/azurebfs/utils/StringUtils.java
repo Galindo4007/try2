@@ -30,4 +30,10 @@ public final class StringUtils {
     public static String formatWithPrecision(double value) {
         return String.format("%.3f", value);
     }
+
+    /**
+     * Private constructor to prevent instantiation.
+     */
+    private StringUtils() {
+    }
 }
