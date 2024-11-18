@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.fs.impl.prefetch;
 
+import java.time.Duration;
+
 import org.junit.Test;
 
 import org.apache.hadoop.test.AbstractHadoopTestBase;
@@ -35,34 +37,39 @@ public class TestBufferPool extends AbstractHadoopTestBase {
 
   private static final int BUFFER_SIZE = 10;
 
+  public static final Duration MAX_RETRY = Duration.ofSeconds(10);
+
+  public static final Duration UPDATE_INTERVAL = Duration.ofSeconds(1);
+
   private final PrefetchingStatistics statistics =
       EmptyPrefetchingStatistics.getInstance();
 
   @Test
   public void testArgChecks() throws Exception {
     // Should not throw.
-    BufferPool pool = new BufferPool(POOL_SIZE, BUFFER_SIZE, statistics);
+    BufferPool pool = new BufferPool(POOL_SIZE, BUFFER_SIZE, statistics, MAX_RETRY,
+        UPDATE_INTERVAL);
 
     // Verify it throws correctly.
 
     intercept(IllegalArgumentException.class,
         "'size' must be a positive integer",
-        () -> new BufferPool(0, 10, statistics));
+        () -> new BufferPool(0, 10, statistics, MAX_RETRY, UPDATE_INTERVAL));
 
     intercept(IllegalArgumentException.class,
         "'size' must be a positive integer",
-        () -> new BufferPool(-1, 10, statistics));
+        () -> new BufferPool(-1, 10, statistics, MAX_RETRY, UPDATE_INTERVAL));
 
     intercept(IllegalArgumentException.class,
         "'bufferSize' must be a positive integer",
-        () -> new BufferPool(10, 0, statistics));
+        () -> new BufferPool(10, 0, statistics, MAX_RETRY, UPDATE_INTERVAL));
 
     intercept(IllegalArgumentException.class,
         "'bufferSize' must be a positive integer",
-        () -> new BufferPool(1, -10, statistics));
+        () -> new BufferPool(1, -10, statistics, MAX_RETRY, UPDATE_INTERVAL));
 
     intercept(NullPointerException.class,
-        () -> new BufferPool(1, 10, null));
+        () -> new BufferPool(1, 10, null, MAX_RETRY, UPDATE_INTERVAL));
 
     intercept(IllegalArgumentException.class,
         "'blockNumber' must not be negative",
@@ -79,7 +86,8 @@ public class TestBufferPool extends AbstractHadoopTestBase {
 
   @Test
   public void testGetAndRelease() {
-    BufferPool pool = new BufferPool(POOL_SIZE, BUFFER_SIZE, statistics);
+    BufferPool pool = new BufferPool(POOL_SIZE, BUFFER_SIZE, statistics, MAX_RETRY,
+        UPDATE_INTERVAL);
     assertInitialState(pool, POOL_SIZE);
 
     int count = 0;
@@ -127,7 +135,8 @@ public class TestBufferPool extends AbstractHadoopTestBase {
       boolean expectThrow)
       throws Exception {
 
-    BufferPool pool = new BufferPool(POOL_SIZE, BUFFER_SIZE, statistics);
+    BufferPool pool = new BufferPool(POOL_SIZE, BUFFER_SIZE, statistics, MAX_RETRY,
+        UPDATE_INTERVAL);
     assertInitialState(pool, POOL_SIZE);
 
     BufferData data = this.acquire(pool, 1);

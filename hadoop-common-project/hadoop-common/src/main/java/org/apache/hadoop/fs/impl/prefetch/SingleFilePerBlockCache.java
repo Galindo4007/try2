@@ -480,6 +480,8 @@ public class SingleFilePerBlockCache implements BlockCache {
       } else {
         try {
           if (Files.deleteIfExists(elementToPurge.path)) {
+            LOG.debug("Removing and evicting Cache file {}: {}",
+                elementToPurge.path, elementToPurge);
             entryListSize--;
             prefetchingStatistics.blockRemovedFromFileCache();
             blocks.remove(elementToPurge.blockNumber);
@@ -641,7 +643,7 @@ public class SingleFilePerBlockCache implements BlockCache {
     StringBuilder sb = new StringBuilder();
     sb.append(String.format(
         "#entries = %d, #gets = %d",
-        blocks.size(), numGets));
+        blocks.size(), numGets.get()));
     return sb.toString();
   }
 

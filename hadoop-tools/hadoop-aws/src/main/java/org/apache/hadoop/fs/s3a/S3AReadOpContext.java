@@ -297,7 +297,7 @@ public class S3AReadOpContext extends S3AOpContext {
    * @return the size of prefetch queue (in number of blocks).
    */
   public int getPrefetchBlockCount() {
-    return this.prefetchBlockCount;
+    return prefetchBlockCount;
   }
 
   /**

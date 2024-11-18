@@ -21,6 +21,7 @@ package org.apache.hadoop.fs.impl.prefetch;
 
 import java.io.Closeable;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -56,6 +57,10 @@ public class BufferPool implements Closeable {
    */
   private final int bufferSize;
 
+  private final Duration maxRetry;
+
+  private final Duration updateInterval;
+
   /*
    Invariants for internal state.
    -- a buffer is either in this.pool or in this.allocated
@@ -84,18 +89,22 @@ public class BufferPool implements Closeable {
    * @param size number of buffer in this pool.
    * @param bufferSize size in bytes of each buffer.
    * @param prefetchingStatistics statistics for this stream.
+   * @param maxRetry max time to retry
+   * @param updateInterval interval for updates
    * @throws IllegalArgumentException if size is zero or negative.
    * @throws IllegalArgumentException if bufferSize is zero or negative.
    */
   public BufferPool(int size,
       int bufferSize,
-      PrefetchingStatistics prefetchingStatistics) {
+      PrefetchingStatistics prefetchingStatistics,
+      Duration maxRetry,
+      Duration updateInterval) {
     Validate.checkPositiveInteger(size, "size");
     Validate.checkPositiveInteger(bufferSize, "bufferSize");
 
     this.size = size;
     this.bufferSize = bufferSize;
-    this.allocated = new IdentityHashMap<BufferData, ByteBuffer>();
+    this.allocated = new IdentityHashMap<>();
     this.prefetchingStatistics = requireNonNull(prefetchingStatistics);
     this.pool = new BoundedResourcePool<ByteBuffer>(size) {
       @Override
@@ -105,6 +114,8 @@ public class BufferPool implements Closeable {
         return buffer;
       }
     };
+    this.maxRetry = maxRetry;
+    this.updateInterval = updateInterval;
   }
 
   /**
@@ -124,8 +135,8 @@ public class BufferPool implements Closeable {
    */
   public synchronized BufferData acquire(int blockNumber) {
     BufferData data;
-    final int maxRetryDelayMs = 600 * 1000;
-    final int statusUpdateDelayMs = 120 * 1000;
+    final int maxRetryDelayMs = (int) maxRetry.toMillis();
+    final int statusUpdateDelayMs = (int) updateInterval.toMillis();
     Retryer retryer = new Retryer(10, maxRetryDelayMs, statusUpdateDelayMs);
 
     do {

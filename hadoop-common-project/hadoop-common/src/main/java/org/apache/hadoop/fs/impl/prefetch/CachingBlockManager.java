@@ -136,11 +136,13 @@ public abstract class CachingBlockManager extends BlockManager {
     this.cachingDisabled = new AtomicBoolean();
     this.prefetchingStatistics = requireNonNull(
         blockManagerParameters.getPrefetchingStatistics(), "prefetching statistics");
-    this.conf = requireNonNull(blockManagerParameters.getConf(), "configuratin");
+    this.conf = requireNonNull(blockManagerParameters.getConf(), "configuration");
 
     if (getBlockData().getFileSize() > 0) {
       this.bufferPool = new BufferPool(bufferPoolSize, getBlockData().getBlockSize(),
-          this.prefetchingStatistics);
+          this.prefetchingStatistics,
+          blockManagerParameters.getMaxRetry(),
+          blockManagerParameters.getUpdateInterval());
       this.cache = createCache(blockManagerParameters.getMaxBlocksCount(),
           blockManagerParameters.getTrackerFactory());
     }
@@ -148,7 +150,7 @@ public abstract class CachingBlockManager extends BlockManager {
     this.ops = new BlockOperations();
     this.ops.setDebug(LOG.isDebugEnabled());
     this.localDirAllocator = blockManagerParameters.getLocalDirAllocator();
-    prefetchingStatistics.setPrefetchDiskCachingState(true);
+    this.prefetchingStatistics.setPrefetchDiskCachingState(true);
   }
 
   /**

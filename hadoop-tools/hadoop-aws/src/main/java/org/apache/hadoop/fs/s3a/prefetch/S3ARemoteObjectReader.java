@@ -93,17 +93,17 @@ public class S3ARemoteObjectReader implements Closeable {
     Validate.checkWithinRange(offset, "offset", 0, this.remoteObject.size());
     Validate.checkPositiveInteger(size, "size");
 
-    if (this.closed) {
+    if (closed) {
       return -1;
     }
 
-    int reqSize = (int) Math.min(size, this.remoteObject.size() - offset);
+    int reqSize = (int) Math.min(size, remoteObject.size() - offset);
     return readOneBlockWithRetries(buffer, offset, reqSize);
   }
 
   @Override
   public void close() {
-    this.closed = true;
+    closed = true;
   }
 
   /**
@@ -124,26 +124,26 @@ public class S3ARemoteObjectReader implements Closeable {
   private int readOneBlockWithRetries(ByteBuffer buffer, long offset, int size)
       throws IOException {
 
-    this.streamStatistics.readOperationStarted(offset, size);
-    Invoker invoker = this.remoteObject.getReadInvoker();
+    streamStatistics.readOperationStarted(offset, size);
+    Invoker invoker = remoteObject.getReadInvoker();
 
-    final String path = this.remoteObject.getPath();
+    final String path = remoteObject.getPath();
     EOFException invokerResponse =
-        invoker.retry(String.format("read %s [%d-%d]", path, offset, offset + size),
+        invoker.retry(String.format("read %s [%d-%d]", path, offset, offset + size - 1),
             path, true,
             trackDurationOfOperation(streamStatistics,
                 STREAM_READ_REMOTE_BLOCK_READ, () -> {
                   try {
-                    this.readOneBlock(buffer, offset, size);
+                    readOneBlock(buffer, offset, size);
                   } catch (HttpChannelEOFException e) {
                     // EOF subclasses with are rethrown as errors.
-                    this.remoteObject.getStatistics().readException();
+                    remoteObject.getStatistics().readException();
                     throw e;
                   } catch (EOFException e) {
                     // the base implementation swallows EOFs.
                     return e;
                   } catch (IOException e) {
-                    this.remoteObject.getStatistics().readException();
+                    remoteObject.getStatistics().readException();
                     throw e;
                   }
                   return null;
@@ -155,7 +155,7 @@ public class S3ARemoteObjectReader implements Closeable {
       // fewer bytes came back; log at debug
       LOG.debug("Expected to read {} bytes but got {}", size, numBytesRead);
     }
-    this.remoteObject.getStatistics()
+    remoteObject.getStatistics()
         .readOperationCompleted(size, numBytesRead);
 
     if (invokerResponse != null) {
@@ -211,7 +211,7 @@ public class S3ARemoteObjectReader implements Closeable {
           numRemainingBytes -= numBytes;
         }
       }
-      while (!this.closed && (numRemainingBytes > 0));
+      while (!closed && (numRemainingBytes > 0));
     } finally {
       remoteObject.close(inputStream, numRemainingBytes);
     }

@@ -39,7 +39,6 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.s3a.performance.AbstractS3ACostTest;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsContext;
-import org.apache.hadoop.test.LambdaTestUtils;
 
 import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY;
 import static org.apache.hadoop.fs.s3a.Constants.BUFFER_DIR;
@@ -61,7 +60,9 @@ import static org.apache.hadoop.fs.statistics.StreamStatisticNames.STREAM_READ_B
 import static org.apache.hadoop.fs.statistics.StreamStatisticNames.STREAM_READ_OPENED;
 import static org.apache.hadoop.fs.statistics.StreamStatisticNames.STREAM_READ_PREFETCH_OPERATIONS;
 import static org.apache.hadoop.fs.statistics.StreamStatisticNames.STREAM_READ_REMOTE_BLOCK_READ;
+import static org.apache.hadoop.test.LambdaTestUtils.eventually;
 import static org.apache.hadoop.test.Sizes.S_1K;
+import static org.apache.hadoop.test.Sizes.S_512;
 
 /**
  * Test the prefetching input stream, validates that the underlying S3ACachingInputStream and
@@ -72,14 +73,14 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
   private static final Logger LOG =
       LoggerFactory.getLogger(ITestS3APrefetchingLargeFiles.class);
 
-  private static final int S_500 = 512;
+  /**
+   * Time to wait for all eventual probes: {@value}.
+   */
+  private static final int TIMEOUT_MILLIS = 5_000;
 
-  private int numBlocks;
-
-  // Size should be > block size so S3ACachingInputStream is used
-  private long largeFileSize;
-
-  private static final int TIMEOUT_MILLIS = 5000;
+  /**
+   * Interval when to waiting for all eventual probes: {@value}.
+   */
   private static final int INTERVAL_MILLIS = 500;
 
   /**
@@ -93,10 +94,22 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
   public static final int LARGE_FILE_SIZE = S_1K * 72;
 
   /**
+   * prefetch block count: {@value}.
+   */
+  public static final int BLOCK_COUNT = 1;
+
+  /**
    * large file dataset.
    */
   private static final byte[] DATASET = ContractTestUtils.dataset(LARGE_FILE_SIZE, 'a', 26);
 
+
+  private int numBlocks;
+
+  /**
+   * Size MUST > block size so S3ACachingInputStream is used
+   */
+  private long largeFileSize;
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -117,7 +130,7 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
         PREFETCH_BLOCK_SIZE_KEY);
     conf.setBoolean(PREFETCH_ENABLED_KEY, true);
     conf.setInt(PREFETCH_BLOCK_SIZE_KEY, BLOCK_SIZE);
-    conf.setInt(PREFETCH_BLOCK_COUNT_KEY, 2);
+    conf.setInt(PREFETCH_BLOCK_COUNT_KEY, BLOCK_COUNT);
     conf.set(BUFFER_DIR, tmpFileDir.getAbsolutePath());
     return conf;
   }
@@ -152,7 +165,7 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
     if (largeFileSize == 0) {
       return 0;
     } else {
-      return ((int) (largeFileSize / blockSize)) + (largeFileSize % blockSize > 0 ? 1 : 0);
+      return ((int) (largeFileSize / blockSize)) + (largeFileSize % blockSize > 0 ? BLOCK_COUNT : 0);
     }
   }
 
@@ -180,7 +193,7 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
 
       // Assert that first block is read synchronously, following blocks are prefetched
       verifyStatisticCounterValue(ioStats, STREAM_READ_PREFETCH_OPERATIONS,
-          numBlocks - 1);
+          numBlocks - BLOCK_COUNT);
       verifyStatisticCounterValue(ioStats, ACTION_HTTP_GET_REQUEST, numBlocks);
       verifyStatisticCounterValue(ioStats, STREAM_READ_OPENED, numBlocks);
 
@@ -199,9 +212,9 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
    */
   private static void assertPrefetchingAndCachingEnabled(final IOStatistics ioStats) {
     // prefetching is on
-    verifyStatisticGaugeValue(ioStats, STREAM_READ_BLOCK_PREFETCH_ENABLED, 1);
+    verifyStatisticGaugeValue(ioStats, STREAM_READ_BLOCK_PREFETCH_ENABLED, BLOCK_COUNT);
     // there is caching
-    verifyStatisticGaugeValue(ioStats, STREAM_READ_BLOCK_CACHE_ENABLED, 1);
+    verifyStatisticGaugeValue(ioStats, STREAM_READ_BLOCK_CACHE_ENABLED, BLOCK_COUNT);
   }
 
   private void printStreamStatistics(final FSDataInputStream in) {
@@ -234,7 +247,7 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
 
       // Assert that first block is read synchronously, following blocks are prefetched
       verifyStatisticCounterValue(ioStats, STREAM_READ_PREFETCH_OPERATIONS,
-          numBlocks - 1);
+          numBlocks - BLOCK_COUNT);
       verifyStatisticCounterValue(ioStats, ACTION_HTTP_GET_REQUEST, numBlocks);
       verifyStatisticCounterValue(ioStats, STREAM_READ_OPENED, numBlocks);
     }
@@ -251,7 +264,6 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
   /**
    * Random read of a large file, with a small block size
    * so as to reduce wait time for read completion.
-   * @throws Throwable
    */
   @Test
   public void testRandomReadLargeFile() throws Throwable {
@@ -259,35 +271,37 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
     IOStatistics ioStats;
     final Path path = createLargeFile();
 
-    describe("Commencing Read Sequence");
-    try (FSDataInputStream in = getFileSystem()
+    describe("\n=== Commencing Read Sequence ===\n");
+    FSDataInputStream in = getFileSystem()
         .openFile(path)
         .opt(FS_OPTION_OPENFILE_READ_POLICY, "random")
-        .build().get()) {
+        .build().get();
+    try {
       ioStats = in.getIOStatistics();
 
       byte[] buffer = new byte[BLOCK_SIZE];
 
-      // there is no prefetch of block 0
-      awaitCachedBlocks(ioStats, 0);
+      LOG.info("there is no prefetch of block 0");
+      awaitCachedBlocks(in, 0);
 
-      // Don't read block 0 completely so it gets cached on read after seek
+      LOG.info("Don't read block 0 completely so it gets cached on read after seek");
+      LOG.info("Expect no prefetch of remainder");
       in.read(buffer, 0, BLOCK_SIZE - S_1K);
-      awaitCachedBlocks(ioStats, 1);
+      awaitCachedBlocks(in, BLOCK_COUNT);
 
       // Seek to block 2 and read all of it
       in.seek(BLOCK_SIZE * 2);
       in.read(buffer, 0, BLOCK_SIZE);
 
-      // so no increment in cache block count
-      awaitCachedBlocks(ioStats, 1);
+      LOG.info(" no increment in cache block count after reading block2");
+      awaitCachedBlocks(in, BLOCK_COUNT);
 
-      // Seek to block 4 but don't read: noop.
+      LOG.info("Seek to block 4 but don't read: noop.");
       in.seek(BLOCK_SIZE * 4);
-      awaitCachedBlocks(ioStats, 1);
+      awaitCachedBlocks(in, BLOCK_COUNT);
 
       // Backwards seek, will use cached block 0
-      in.seek(S_500 * 5);
+      in.seek(S_512 * 5);
       in.read();
 
       AtomicLong iterations = new AtomicLong();
@@ -297,16 +311,27 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
        */
       // Expected to get block 0 (partially read), 1 (prefetch), 2 (fully read), 3 (prefetch)
       // Blocks 0, 1, 3 were not fully read, so remain in the file cache
-      LambdaTestUtils.eventually(TIMEOUT_MILLIS, INTERVAL_MILLIS, () -> {
+      LOG.info("probe HEAD/GET requests");
+
+      eventually(TIMEOUT_MILLIS, INTERVAL_MILLIS, () -> {
         LOG.info("Attempt {}: {}", iterations.incrementAndGet(),
             ioStatisticsToPrettyString(ioStats));
         verifyStatisticCounterValue(ioStats, ACTION_HTTP_GET_REQUEST, 4);
         verifyStatisticCounterValue(ioStats, STREAM_READ_OPENED, 4);
       });
       printStreamStatistics(in);
+
+      in.close();
+      awaitCachedBlocks(in, 0);
+      in = null;
+    } finally {
+      if (in != null) {
+        // we get here if an exception was raised as in will still be set.
+        LOG.info("Final stream statistics\n{}",
+            ioStatisticsToPrettyString(in.getIOStatistics()));
+      }
     }
-    awaitCachedBlocks(ioStats, 0);
-    LambdaTestUtils.eventually(TIMEOUT_MILLIS, INTERVAL_MILLIS, () -> {
+    eventually(TIMEOUT_MILLIS, INTERVAL_MILLIS, () -> {
       verifyStatisticGaugeValue(ioStats, STREAM_READ_ACTIVE_MEMORY_IN_USE, 0);
     });
 
@@ -314,12 +339,14 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
 
   /**
    * Await the cached block count to match the expected value.
-   * @param ioStats live statistics
+   * @param in
    * @param count count of blocks
    * @throws Exception failure
    */
-  public void awaitCachedBlocks(final IOStatistics ioStats, final long count) throws Exception {
-    LambdaTestUtils.eventually(TIMEOUT_MILLIS, INTERVAL_MILLIS, () -> {
+  public void awaitCachedBlocks(final FSDataInputStream in, final long count) throws Exception {
+    IOStatistics ioStats = in.getIOStatistics();
+
+    eventually(TIMEOUT_MILLIS, INTERVAL_MILLIS, () -> {
       verifyStatisticGaugeValue(ioStats, STREAM_READ_BLOCKS_IN_FILE_CACHE, count);
       verifyStatisticGaugeValue(ioStats, STREAM_READ_ACTIVE_MEMORY_IN_USE, 0);
     });
@@ -342,7 +369,7 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
       // caching is enabled
       final IOStatistics ioStats = in.getIOStatistics();
       assertThatStatisticGauge(ioStats, STREAM_READ_BLOCK_CACHE_ENABLED)
-          .isEqualTo(1);
+          .isEqualTo(BLOCK_COUNT);
 
       // read less than the block size
       LOG.info("reading first data block");
@@ -351,7 +378,7 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
 
       // there's been at least one fetch so far; others may be in progress.
       assertThatStatisticCounter(ioStats, ACTION_HTTP_GET_REQUEST)
-          .isGreaterThanOrEqualTo(1);
+          .isGreaterThanOrEqualTo(BLOCK_COUNT);
 
 
       //assertCacheFileExists();
@@ -364,7 +391,7 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
 
       // and at least one block is in cache
       assertThatStatisticGauge(ioStats, STREAM_READ_BLOCKS_IN_FILE_CACHE)
-          .isGreaterThanOrEqualTo(1);
+          .isGreaterThanOrEqualTo(BLOCK_COUNT);
 
       // a file which must be under the tempt dir
       assertCacheFileExists();
@@ -382,7 +409,7 @@ public class ITestS3APrefetchingLargeFiles extends AbstractS3ACostTest {
     Assertions.assertThat(tmpFiles)
         .describedAs("No cache files found under " + tmpFileDir)
         .isNotNull()
-        .hasSizeGreaterThanOrEqualTo(1);
+        .hasSizeGreaterThanOrEqualTo(BLOCK_COUNT);
 
     for (File tmpFile : tmpFiles) {
       Path path = new Path(tmpFile.getAbsolutePath());

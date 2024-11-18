@@ -20,6 +20,7 @@
 package org.apache.hadoop.fs.s3a.prefetch;
 
 import java.io.IOException;
+import java.time.Duration;
 
 import javax.annotation.Nonnull;
 
@@ -52,7 +53,11 @@ public class S3ACachingInputStream extends S3ARemoteInputStream {
   private static final Logger LOG = LoggerFactory.getLogger(
       S3ACachingInputStream.class);
 
-  public static final int BLOCKS_TO_PREFETCH_AFTER_SEEK = 1;
+  /**
+   * How many blocks to prefetch after a seek, that is -
+   * beyond the current block: {@value}.
+   */
+  public static final int BLOCKS_TO_PREFETCH_AFTER_SEEK = 0;
 
   /**
    * Number of blocks queued for prefetching.
@@ -61,8 +66,14 @@ public class S3ACachingInputStream extends S3ARemoteInputStream {
 
   private final Configuration conf;
 
+  /**
+   * Directory allocator.
+   */
   private final LocalDirAllocator localDirAllocator;
 
+  /**
+   * Block manager; created on demand.
+   */
   private BlockManager blockManager;
 
   /**
@@ -93,7 +104,7 @@ public class S3ACachingInputStream extends S3ARemoteInputStream {
     demandCreateBlockManager();
 
     int fileSize = (int) s3Attributes.getLen();
-    LOG.debug("Created caching input stream for {} (size = {})", this.getName(),
+    LOG.debug("Created caching input stream for {} (size = {})", getName(),
         fileSize);
     streamStatistics.setPrefetchState(
         true,
@@ -107,7 +118,7 @@ public class S3ACachingInputStream extends S3ARemoteInputStream {
   private synchronized void demandCreateBlockManager() {
     if (blockManager == null) {
       LOG.debug("{}: creating block manager", getName());
-      int bufferPoolSize = this.numBlocksToPrefetch + BLOCKS_TO_PREFETCH_AFTER_SEEK;
+      int bufferPoolSize = numBlocksToPrefetch + BLOCKS_TO_PREFETCH_AFTER_SEEK;
       final S3AReadOpContext readOpContext = this.getContext();
       BlockManagerParameters blockManagerParamsBuilder =
           new BlockManagerParameters()
@@ -120,19 +131,22 @@ public class S3ACachingInputStream extends S3ARemoteInputStream {
               .withMaxBlocksCount(
                   conf.getInt(PREFETCH_MAX_BLOCKS_COUNT, DEFAULT_PREFETCH_MAX_BLOCKS_COUNT))
               .withPrefetchingStatistics(getS3AStreamStatistics())
-              .withTrackerFactory(getS3AStreamStatistics());
+              .withTrackerFactory(getS3AStreamStatistics())
+              .withMaxRetry(Duration.ofSeconds(60))
+              .withUpdateInterval(Duration.ofSeconds(10));
+
       blockManager = createBlockManager(blockManagerParamsBuilder, getReader());
     }
   }
 
   @Override
-  public void close() throws IOException {
+  public synchronized void close() throws IOException {
     // Close the BlockManager first, cancelling active prefetches,
     // deleting cached files and freeing memory used by buffer pool.
     if (!isClosed()) {
       closeBlockManager();
       super.close();
-      LOG.info("closed: {}", getName());
+      LOG.debug("closed: {}", getName());
     }
   }
 
@@ -166,7 +180,9 @@ public class S3ACachingInputStream extends S3ARemoteInputStream {
     demandCreateBlockManager();
 
     long readPos = getNextReadPos();
+    LOG.debug("Ensure current buffer at {} is available", readPos);
     if (!getBlockData().isValidOffset(readPos)) {
+      LOG.debug("Block already in cache");
       // the block exists
       return false;
     }

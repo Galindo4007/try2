@@ -505,7 +505,6 @@ public abstract class S3ARemoteInputStream
 
   /**
    * Closes this stream and releases all acquired resources.
-   *
    * @throws IOException if there is an IO error during this operation.
    */
   @Override

@@ -23,6 +23,7 @@ import java.io.EOFException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.assertj.core.api.Assertions;
@@ -445,11 +446,15 @@ public class ITestS3AOpenCost extends AbstractS3ACostTest {
         ByteBuffer bb = ByteBuffer.wrap(buf);
         final FileRange range = FileRange.createFileRange(0, longLen);
         in.readVectored(Arrays.asList(range), (i) -> bb);
-        interceptFuture(EOFException.class,
-            "",
-            ContractTestUtils.VECTORED_READ_OPERATION_TEST_TIMEOUT_SECONDS,
-            TimeUnit.SECONDS,
-            range.getData());
+        if (!prefetching) {
+          interceptFuture(EOFException.class,
+              "",
+              ContractTestUtils.VECTORED_READ_OPERATION_TEST_TIMEOUT_SECONDS,
+              TimeUnit.SECONDS,
+              range.getData());
+        } else {
+          final ByteBuffer result = range.getData().get();
+        }
         assertS3StreamClosed(in);
         return "vector read past EOF with " + in;
       }

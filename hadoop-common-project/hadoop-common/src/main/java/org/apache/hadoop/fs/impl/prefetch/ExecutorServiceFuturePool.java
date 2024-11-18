@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
@@ -42,6 +43,8 @@ import org.apache.hadoop.util.concurrent.HadoopExecutors;
  *
  */
 public class ExecutorServiceFuturePool {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      ExecutorServiceFuturePool.class);
 
   private final ExecutorService executor;
 
@@ -56,6 +59,8 @@ public class ExecutorServiceFuturePool {
    * @throws NullPointerException if f param is null
    */
   public Future<Void> executeFunction(final Supplier<Void> f) {
+
+    LOG.debug("Executing function {}", f);
     return executor.submit(f::get);
   }
 
@@ -67,6 +72,8 @@ public class ExecutorServiceFuturePool {
    */
   @SuppressWarnings("unchecked")
   public Future<Void> executeRunnable(final Runnable r) {
+    LOG.debug("Executing runnable {}", r);
+
     return (Future<Void>) executor.submit(r::run);
   }
 
@@ -79,6 +86,8 @@ public class ExecutorServiceFuturePool {
    * @param unit the time unit of the timeout argument
    */
   public void shutdown(Logger logger, long timeout, TimeUnit unit) {
+    LOG.debug("Shutdown");
+
     HadoopExecutors.shutdown(executor, logger, timeout, unit);
   }
 

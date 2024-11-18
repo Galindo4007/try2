@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.fs.impl.prefetch;
 
+import java.time.Duration;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
@@ -76,6 +78,10 @@ public final class BlockManagerParameters {
    */
   private DurationTrackerFactory trackerFactory;
 
+
+  private Duration maxRetry;
+
+private         Duration updateInterval;
   /**
    * @return The Executor future pool to perform async prefetch tasks.
    */
@@ -245,5 +251,33 @@ public final class BlockManagerParameters {
   public BlockManagerParameters withPath(final Path value) {
     path = value;
     return this;
+  }
+
+  /**
+   * Set builder value.
+   * @param value new value
+   * @return the builder
+   */
+  public BlockManagerParameters withMaxRetry(final Duration value) {
+    maxRetry = value;
+    return this;
+  }
+
+  public Duration getMaxRetry() {
+    return maxRetry;
+  }
+
+  /**
+   * Set builder value.
+   * @param value new value
+   * @return the builder
+   */
+  public BlockManagerParameters withUpdateInterval(final Duration value) {
+    updateInterval = value;
+    return this;
+  }
+
+  public Duration getUpdateInterval() {
+    return updateInterval;
   }
 }
