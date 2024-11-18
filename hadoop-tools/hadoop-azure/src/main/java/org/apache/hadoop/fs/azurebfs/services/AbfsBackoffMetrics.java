@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.azurebfs.enums.StatisticTypeEnum;
 import org.apache.hadoop.fs.azurebfs.statistics.AbstractAbfsStatisticsSource;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
 
+import static org.apache.hadoop.fs.azurebfs.constants.AbfsHttpConstants.EMPTY_STRING;
 import static org.apache.hadoop.fs.azurebfs.constants.FileSystemConfigurations.HUNDRED;
 import static org.apache.hadoop.fs.azurebfs.constants.FileSystemConfigurations.THOUSAND;
 import static org.apache.hadoop.fs.azurebfs.constants.MetricsConstants.RETRY;
@@ -55,6 +56,7 @@ import static org.apache.hadoop.fs.azurebfs.enums.RetryValue.FIFTEEN_TWENTY_FIVE
 import static org.apache.hadoop.fs.azurebfs.enums.RetryValue.TWENTY_FIVE_AND_ABOVE;
 import static org.apache.hadoop.fs.azurebfs.enums.StatisticTypeEnum.TYPE_COUNTER;
 import static org.apache.hadoop.fs.azurebfs.enums.StatisticTypeEnum.TYPE_GAUGE;
+import static org.apache.hadoop.fs.azurebfs.utils.StringUtils.formatWithPrecision;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
 /**
@@ -202,51 +204,68 @@ public class AbfsBackoffMetrics extends AbstractAbfsStatisticsSource {
   1.RCTSI :- Request count that succeeded in x retries
   2.MMA :- Min Max Average (This refers to the backoff or sleep time between 2 requests)
   3.s :- seconds
-  4.BWT :- Number of Bandwidth throttled requests
-  5.IT :- Number of IOPS throttled requests
-  6.OT :- Number of Other throttled requests
-  7.NFR :- Number of requests which failed due to network errors
-  8.%RT :- Percentage of requests that are throttled
-  9.TRNR :- Total number of requests which succeeded without retrying
-  10.TRF :- Total number of requests which failed
-  11.TR :- Total number of requests which were made
-  12.MRC :- Max retry count across all requests
    */
-  @Override
-  public String toString() {
-    if (getMetricValue(TOTAL_NUMBER_OF_REQUESTS) == 0) {
-      return "";
+  private void getRetryMetrics(StringBuilder metricBuilder) {
+    for (RetryValue retryCount : RETRY_LIST) {
+      long totalRequests = getMetricValue(TOTAL_REQUESTS, retryCount);
+      metricBuilder.append("$RCTSI$_").append(retryCount.getValue())
+              .append("R=").append(getMetricValue(NUMBER_OF_REQUESTS_SUCCEEDED, retryCount));
+
+      if (totalRequests > 0) {
+        metricBuilder.append("$MMA$_").append(retryCount.getValue())
+                .append("R=").append(formatWithPrecision((double) getMetricValue(MIN_BACK_OFF, retryCount) / THOUSAND)).append("s")
+                .append(formatWithPrecision((double) getMetricValue(MAX_BACK_OFF, retryCount) / THOUSAND)).append("s")
+                .append(formatWithPrecision((double) getMetricValue(TOTAL_BACK_OFF, retryCount) / totalRequests / THOUSAND)).append("s");
+      } else {
+        metricBuilder.append("$MMA$_").append(retryCount.getValue()).append("R=0s");
+      }
     }
-    StringBuilder metricString = new StringBuilder();
+  }
+
+  /*
+  Acronyms :-
+  1.BWT :- Number of Bandwidth throttled requests
+  2.IT :- Number of IOPS throttled requests
+  3.OT :- Number of Other throttled requests
+  4.NFR :- Number of requests which failed due to network errors
+  5.%RT :- Percentage of requests that are throttled
+  6.TRNR :- Total number of requests which succeeded without retrying
+  7.TRF :- Total number of requests which failed
+  8.TR :- Total number of requests which were made
+  9.MRC :- Max retry count across all requests
+   */
+  private void getMmaMetrics(StringBuilder metricBuilder) {
     long totalRequestsThrottled = getMetricValue(NUMBER_OF_NETWORK_FAILED_REQUESTS)
             + getMetricValue(NUMBER_OF_IOPS_THROTTLED_REQUESTS)
             + getMetricValue(NUMBER_OF_OTHER_THROTTLED_REQUESTS)
             + getMetricValue(NUMBER_OF_BANDWIDTH_THROTTLED_REQUESTS);
     double percentageOfRequestsThrottled = ((double) totalRequestsThrottled / getMetricValue(TOTAL_NUMBER_OF_REQUESTS)) * HUNDRED;
 
-    for (RetryValue retryCount : RETRY_LIST) {
-      long totalRequests = getMetricValue(TOTAL_REQUESTS, retryCount);
-      metricString.append("$RCTSI$_").append(retryCount.getValue()).append("R=").append(getMetricValue(NUMBER_OF_REQUESTS_SUCCEEDED, retryCount));
-      if (totalRequests > 0) {
-        metricString.append("$MMA$_").append(retryCount.getValue()).append("R=")
-                .append(String.format("%.3f", (double) getMetricValue(MIN_BACK_OFF, retryCount) / THOUSAND)).append("s")
-                .append(String.format("%.3f", (double) getMetricValue(MAX_BACK_OFF, retryCount) / THOUSAND)).append("s")
-                .append(String.format("%.3f", (double) getMetricValue(TOTAL_BACK_OFF, retryCount) / totalRequests / THOUSAND)).append("s");
-      } else {
-        metricString.append("$MMA$_").append(retryCount.getValue()).append("R=0s");
-      }
-    }
-    metricString.append("$BWT=").append(getMetricValue(NUMBER_OF_BANDWIDTH_THROTTLED_REQUESTS))
+    metricBuilder.append("$BWT=").append(getMetricValue(NUMBER_OF_BANDWIDTH_THROTTLED_REQUESTS))
             .append("$IT=").append(getMetricValue(NUMBER_OF_IOPS_THROTTLED_REQUESTS))
             .append("$OT=").append(getMetricValue(NUMBER_OF_OTHER_THROTTLED_REQUESTS))
-            .append("$RT=").append(String.format("%.3f", percentageOfRequestsThrottled))
+            .append("$RT=").append(formatWithPrecision(percentageOfRequestsThrottled))
             .append("$NFR=").append(getMetricValue(NUMBER_OF_NETWORK_FAILED_REQUESTS))
             .append("$TRNR=").append(getMetricValue(NUMBER_OF_REQUESTS_SUCCEEDED_WITHOUT_RETRYING))
             .append("$TRF=").append(getMetricValue(NUMBER_OF_REQUESTS_FAILED))
             .append("$TR=").append(getMetricValue(TOTAL_NUMBER_OF_REQUESTS))
             .append("$MRC=").append(getMetricValue(MAX_RETRY_COUNT));
+  }
 
-    return metricString.toString();
+  /**
+   * Retrieves the string representation of the metrics.
+   *
+   * @return the string representation of the metrics
+   */
+  @Override
+  public String toString() {
+    if (getMetricValue(TOTAL_NUMBER_OF_REQUESTS) == 0) {
+      return EMPTY_STRING;
+    }
+    StringBuilder metricBuilder = new StringBuilder();
+    getRetryMetrics(metricBuilder);
+    getMmaMetrics(metricBuilder);
+    return metricBuilder.toString();
   }
 
   @VisibleForTesting

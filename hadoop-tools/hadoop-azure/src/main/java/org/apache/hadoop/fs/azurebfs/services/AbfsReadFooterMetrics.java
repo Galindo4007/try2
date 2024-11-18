@@ -46,6 +46,7 @@ import static org.apache.hadoop.fs.azurebfs.enums.FileType.PARQUET;
 import static org.apache.hadoop.fs.azurebfs.enums.FileType.NON_PARQUET;
 import static org.apache.hadoop.fs.azurebfs.enums.StatisticTypeEnum.TYPE_COUNTER;
 import static org.apache.hadoop.fs.azurebfs.enums.StatisticTypeEnum.TYPE_GAUGE;
+import static org.apache.hadoop.fs.azurebfs.utils.StringUtils.formatWithPrecision;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
 /**
@@ -58,7 +59,7 @@ public class AbfsReadFooterMetrics extends AbstractAbfsStatisticsSource {
     /**
      * Inner class to handle file type checks.
      */
-    private static final class CheckFileType {
+    private static final class FileTypeMetrics {
         private final AtomicBoolean collectMetrics;
         private final AtomicBoolean collectMetricsForNextRead;
         private final AtomicBoolean collectLenMetrics;
@@ -68,7 +69,7 @@ public class AbfsReadFooterMetrics extends AbstractAbfsStatisticsSource {
         private String sizeReadByFirstRead;
         private String offsetDiffBetweenFirstAndSecondRead;
 
-        private CheckFileType() {
+        private FileTypeMetrics() {
             collectMetrics = new AtomicBoolean(false);
             collectMetricsForNextRead = new AtomicBoolean(false);
             collectLenMetrics = new AtomicBoolean(false);
@@ -151,7 +152,7 @@ public class AbfsReadFooterMetrics extends AbstractAbfsStatisticsSource {
         }
     }
 
-    private final Map<String, CheckFileType> checkFileMap = new HashMap<>();
+    private final Map<String, FileTypeMetrics> fileTypeMetricsMap = new HashMap<>();
 
     /**
      * Constructor to initialize the IOStatisticsStore with counters and gauges.
@@ -230,7 +231,7 @@ public class AbfsReadFooterMetrics extends AbstractAbfsStatisticsSource {
      * @param filePathIdentifier the file path identifier
      */
     public void updateMap(String filePathIdentifier) {
-        checkFileMap.computeIfAbsent(filePathIdentifier, key -> new CheckFileType());
+        fileTypeMetricsMap.computeIfAbsent(filePathIdentifier, key -> new FileTypeMetrics());
     }
 
     /**
@@ -242,68 +243,104 @@ public class AbfsReadFooterMetrics extends AbstractAbfsStatisticsSource {
      * @param nextReadPos the position of the next read
      */
     public void checkMetricUpdate(final String filePathIdentifier, final int len, final long contentLength, final long nextReadPos) {
-        CheckFileType checkFileType = checkFileMap.computeIfAbsent(filePathIdentifier, key -> new CheckFileType());
-        if (checkFileType.getReadCount() == 0 || (checkFileType.getReadCount() >= 1 && checkFileType.getCollectMetrics())) {
-            updateMetrics(checkFileType, len, contentLength, nextReadPos);
+        FileTypeMetrics fileTypeMetrics = fileTypeMetricsMap.computeIfAbsent(filePathIdentifier, key -> new FileTypeMetrics());
+        if (fileTypeMetrics.getReadCount() == 0 || (fileTypeMetrics.getReadCount() >= 1 && fileTypeMetrics.getCollectMetrics())) {
+            updateMetrics(fileTypeMetrics, len, contentLength, nextReadPos);
         }
     }
 
     /**
      * Updates metrics for a specific file identified by filePathIdentifier.
      *
-     * @param checkFileType      File metadata to know file type.
+     * @param fileTypeMetrics    File metadata to know file type.
      * @param len                The length of the read operation.
      * @param contentLength      The total content length of the file.
      * @param nextReadPos        The position of the next read operation.
      */
-    private void updateMetrics(CheckFileType checkFileType, int len, long contentLength, long nextReadPos) {
+    private void updateMetrics(FileTypeMetrics fileTypeMetrics, int len, long contentLength, long nextReadPos) {
         synchronized (this) {
-            checkFileType.incrementReadCount();
+            fileTypeMetrics.incrementReadCount();
         }
 
-        long readCount = checkFileType.getReadCount();
+        long readCount = fileTypeMetrics.getReadCount();
 
         if (readCount == 1) {
-            handleFirstRead(checkFileType, nextReadPos, len, contentLength);
+            handleFirstRead(fileTypeMetrics, nextReadPos, len, contentLength);
         } else if (readCount == 2) {
-            handleSecondRead(checkFileType, nextReadPos, len, contentLength);
+            handleSecondRead(fileTypeMetrics, nextReadPos, len, contentLength);
         } else {
-            handleFurtherRead(checkFileType, len);
+            handleFurtherRead(fileTypeMetrics, len);
         }
     }
 
-    private void handleFirstRead(CheckFileType checkFileType, long nextReadPos, int len, long contentLength) {
+    /**
+     * Handles the first read operation by checking if the current read position is near the end of the file.
+     * If it is, updates the {@link FileTypeMetrics} object to enable metrics collection and records the first read's
+     * offset and size.
+     *
+     * @param fileTypeMetrics The {@link FileTypeMetrics} object to update with metrics and read details.
+     * @param nextReadPos The position where the next read will start.
+     * @param len The length of the current read operation.
+     * @param contentLength The total length of the file content.
+     */
+    private void handleFirstRead(FileTypeMetrics fileTypeMetrics, long nextReadPos, int len, long contentLength) {
         if (nextReadPos >= contentLength - (long) Integer.parseInt(FOOTER_LENGTH) * ONE_KB) {
-            checkFileType.setCollectMetrics(true);
-            checkFileType.setCollectMetricsForNextRead(true);
-            checkFileType.setOffsetOfFirstRead(nextReadPos);
-            checkFileType.setSizeReadByFirstRead(len + "_" + Math.abs(contentLength - nextReadPos));
+            fileTypeMetrics.setCollectMetrics(true);
+            fileTypeMetrics.setCollectMetricsForNextRead(true);
+            fileTypeMetrics.setOffsetOfFirstRead(nextReadPos);
+            fileTypeMetrics.setSizeReadByFirstRead(len + "_" + Math.abs(contentLength - nextReadPos));
         }
     }
 
-    private void handleSecondRead(CheckFileType checkFileType, long nextReadPos, int len, long contentLength) {
-        if (checkFileType.getCollectMetricsForNextRead()) {
-            long offsetDiff = Math.abs(nextReadPos - checkFileType.getOffsetOfFirstRead());
-            checkFileType.setOffsetDiffBetweenFirstAndSecondRead(len + "_" + offsetDiff);
-            checkFileType.setCollectLenMetrics(true);
-            checkFileType.updateFileType();
-            updateMetricsData(checkFileType, len, contentLength);
+    /**
+     * Handles the second read operation by checking if metrics collection is enabled for the next read.
+     * If it is, calculates the offset difference between the first and second reads, updates the {@link FileTypeMetrics}
+     * object with this information, and sets the file type. Then, updates the metrics data.
+     *
+     * @param fileTypeMetrics The {@link FileTypeMetrics} object to update with metrics and read details.
+     * @param nextReadPos The position where the next read will start.
+     * @param len The length of the current read operation.
+     * @param contentLength The total length of the file content.
+     */
+    private void handleSecondRead(FileTypeMetrics fileTypeMetrics, long nextReadPos, int len, long contentLength) {
+        if (fileTypeMetrics.getCollectMetricsForNextRead()) {
+            long offsetDiff = Math.abs(nextReadPos - fileTypeMetrics.getOffsetOfFirstRead());
+            fileTypeMetrics.setOffsetDiffBetweenFirstAndSecondRead(len + "_" + offsetDiff);
+            fileTypeMetrics.setCollectLenMetrics(true);
+            fileTypeMetrics.updateFileType();
+            updateMetricsData(fileTypeMetrics, len, contentLength);
         }
     }
 
-    private synchronized void handleFurtherRead(CheckFileType checkFileType, int len) {
-        if (checkFileType.getCollectLenMetrics() && checkFileType.getFileType() != null) {
-            FileType fileType = checkFileType.getFileType();
+    /**
+     * Handles further read operations beyond the second read. If metrics collection is enabled and the file type is set,
+     * updates the read length requested and increments the read count for the specific file type.
+     *
+     * @param fileTypeMetrics The {@link FileTypeMetrics} object containing metrics and read details.
+     * @param len The length of the current read operation.
+     */
+    private synchronized void handleFurtherRead(FileTypeMetrics fileTypeMetrics, int len) {
+        if (fileTypeMetrics.getCollectLenMetrics() && fileTypeMetrics.getFileType() != null) {
+            FileType fileType = fileTypeMetrics.getFileType();
             updateMetricValue(fileType, READ_LEN_REQUESTED, len);
             incrementMetricValue(fileType, READ_COUNT);
         }
     }
 
-    private synchronized void updateMetricsData(CheckFileType checkFileType, int len, long contentLength) {
-        long sizeReadByFirstRead = Long.parseLong(checkFileType.getSizeReadByFirstRead().split("_")[0]);
-        long firstOffsetDiff = Long.parseLong(checkFileType.getSizeReadByFirstRead().split("_")[1]);
-        long secondOffsetDiff = Long.parseLong(checkFileType.getOffsetDiffBetweenFirstAndSecondRead().split("_")[1]);
-        FileType fileType = checkFileType.getFileType();
+    /**
+     * Updates the metrics data for a specific file identified by the {@link FileTypeMetrics} object.
+     * This method calculates and updates various metrics such as read length requested, file length,
+     * size read by the first read, and offset differences between reads.
+     *
+     * @param fileTypeMetrics The {@link FileTypeMetrics} object containing metrics and read details.
+     * @param len The length of the current read operation.
+     * @param contentLength The total length of the file content.
+     */
+    private synchronized void updateMetricsData(FileTypeMetrics fileTypeMetrics, int len, long contentLength) {
+        long sizeReadByFirstRead = Long.parseLong(fileTypeMetrics.getSizeReadByFirstRead().split("_")[0]);
+        long firstOffsetDiff = Long.parseLong(fileTypeMetrics.getSizeReadByFirstRead().split("_")[1]);
+        long secondOffsetDiff = Long.parseLong(fileTypeMetrics.getOffsetDiffBetweenFirstAndSecondRead().split("_")[1]);
+        FileType fileType = fileTypeMetrics.getFileType();
 
         updateMetricValue(fileType, READ_LEN_REQUESTED, len + sizeReadByFirstRead);
         updateMetricValue(fileType, FILE_LENGTH, contentLength);
@@ -314,18 +351,6 @@ public class AbfsReadFooterMetrics extends AbstractAbfsStatisticsSource {
         incrementMetricValue(fileType, TOTAL_FILES);
     }
 
-    /**
-     * Returns the read footer metrics for a given file type.
-     *
-     * @param fileType the type of the file
-     * @return the read footer metrics as a string
-     */
-    public String getReadFooterMetrics(FileType fileType) {
-        StringBuilder readFooterMetric = new StringBuilder();
-        appendMetrics(readFooterMetric, fileType);
-        return readFooterMetric.toString();
-    }
-
     private void appendMetrics(StringBuilder metricBuilder, FileType fileType) {
         long totalFiles = getMetricValue(fileType, TOTAL_FILES);
         long readCount = getMetricValue(fileType, READ_COUNT);
@@ -333,20 +358,19 @@ public class AbfsReadFooterMetrics extends AbstractAbfsStatisticsSource {
             return;
         }
 
-        String sizeReadByFirstRead = String.format("%.3f", getMetricValue(fileType, SIZE_READ_BY_FIRST_READ) / (double) totalFiles);
-        String offsetDiffBetweenFirstAndSecondRead = String.format("%.3f",
-                getMetricValue(fileType, OFFSET_DIFF_BETWEEN_FIRST_AND_SECOND_READ) / (double) totalFiles);
+        String sizeReadByFirstRead = formatWithPrecision(getMetricValue(fileType, SIZE_READ_BY_FIRST_READ) / (double) totalFiles);
+        String offsetDiffBetweenFirstAndSecondRead = formatWithPrecision(getMetricValue(fileType, OFFSET_DIFF_BETWEEN_FIRST_AND_SECOND_READ) / (double) totalFiles);
 
         if (NON_PARQUET.equals(fileType)) {
-            sizeReadByFirstRead += "_" + String.format("%.3f", getMetricValue(fileType, FIRST_OFFSET_DIFF) / (double) totalFiles);
-            offsetDiffBetweenFirstAndSecondRead += "_" + String.format("%.3f", getMetricValue(fileType, SECOND_OFFSET_DIFF) / (double) totalFiles);
+            sizeReadByFirstRead += "_" + formatWithPrecision(getMetricValue(fileType, FIRST_OFFSET_DIFF) / (double) totalFiles);
+            offsetDiffBetweenFirstAndSecondRead += "_" + formatWithPrecision(getMetricValue(fileType, SECOND_OFFSET_DIFF) / (double) totalFiles);
         }
 
         metricBuilder.append("$").append(fileType)
                 .append(":$FR=").append(sizeReadByFirstRead)
                 .append("$SR=").append(offsetDiffBetweenFirstAndSecondRead)
-                .append("$FL=").append(String.format("%.3f", getMetricValue(fileType, FILE_LENGTH) / (double) totalFiles))
-                .append("$RL=").append(String.format("%.3f", getMetricValue(fileType, READ_LEN_REQUESTED) / (double) readCount));
+                .append("$FL=").append(formatWithPrecision(getMetricValue(fileType, FILE_LENGTH) / (double) totalFiles))
+                .append("$RL=").append(formatWithPrecision(getMetricValue(fileType, READ_LEN_REQUESTED) / (double) readCount));
     }
 
     /**

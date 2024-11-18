@@ -35,11 +35,17 @@ public class TestAbfsBackoffMetrics {
     private static final int TOTAL_COUNTERS = 22;
     private static final int TOTAL_GAUGES = 21;
 
+    /**
+     * Sets up the test environment by initializing the AbfsBackoffMetrics instance.
+     */
     @Before
     public void setUp() {
         metrics = new AbfsBackoffMetrics();
     }
 
+    /**
+     * Tests the retrieval of metric names based on the statistic type.
+     */
     @Test
     public void retrievesMetricNamesBasedOnStatisticType() {
         String[] counterMetrics = metrics.getMetricNamesByType(TYPE_COUNTER);
@@ -52,6 +58,9 @@ public class TestAbfsBackoffMetrics {
                 .isEqualTo(TOTAL_GAUGES);
     }
 
+    /**
+     * Tests the retrieval of the value of a specific metric.
+     */
     @Test
     public void retrievesValueOfSpecificMetric() {
         metrics.setMetricValue(NUMBER_OF_REQUESTS_SUCCEEDED, 5, ONE);
@@ -63,6 +72,9 @@ public class TestAbfsBackoffMetrics {
                 .isEqualTo(0);
     }
 
+    /**
+     * Tests the increment of the value of a specific metric.
+     */
     @Test
     public void incrementsValueOfSpecificMetric() {
         metrics.incrementMetricValue(NUMBER_OF_REQUESTS_SUCCEEDED, ONE);
@@ -74,6 +86,9 @@ public class TestAbfsBackoffMetrics {
                 .isEqualTo(0);
     }
 
+    /**
+     * Tests the string representation of empty backoff metrics.
+     */
     @Test
     public void returnsStringRepresentationOfEmptyBackoffMetrics() {
         Assertions.assertThat(metrics.getMetricValue(TOTAL_NUMBER_OF_REQUESTS))
@@ -84,14 +99,17 @@ public class TestAbfsBackoffMetrics {
                 .isEmpty();
     }
 
+    /**
+     * Tests the string representation of backoff metrics.
+     */
     @Test
     public void returnsStringRepresentationOfBackoffMetrics() {
         metrics.incrementMetricValue(TOTAL_NUMBER_OF_REQUESTS);
         Assertions.assertThat(metrics.getMetricValue(TOTAL_NUMBER_OF_REQUESTS))
-                .describedAs("String representation of backoff metrics should be empty")
+                .describedAs("String representation of backoff metrics should not be empty")
                 .isEqualTo(1);
         Assertions.assertThat(metrics.toString())
-                .describedAs("String representation of backoff metrics should be empty")
+                .describedAs("String representation of backoff metrics should not be empty")
                 .contains("$TR=1");
     }
 }

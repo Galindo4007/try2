@@ -26,12 +26,12 @@ import static org.apache.hadoop.fs.azurebfs.enums.StatisticTypeEnum.TYPE_GAUGE;
  * Enum representing various ABFS read footer metrics.
  */
 public enum AbfsReadFooterMetricsEnum {
-    TOTAL_FILES("totalFiles", "Total files in a file system", FILE,  TYPE_COUNTER),
+    TOTAL_FILES("totalFiles", "Total files read", FILE,  TYPE_COUNTER),
     FILE_LENGTH("fileLength", "File length", FILE, TYPE_GAUGE),
     SIZE_READ_BY_FIRST_READ("sizeReadByFirstRead", "Size read by first read", FILE, TYPE_GAUGE),
     OFFSET_DIFF_BETWEEN_FIRST_AND_SECOND_READ("offsetDiffBetweenFirstAndSecondRead", "Offset difference between first and second read", FILE, TYPE_GAUGE),
     READ_LEN_REQUESTED("readLenRequested", "Read length requested", FILE, TYPE_GAUGE),
-    READ_COUNT("readCount", "Read count", FILE, TYPE_COUNTER),
+    READ_COUNT("readCount", "Number of total reads", FILE, TYPE_COUNTER),
     FIRST_OFFSET_DIFF("firstOffsetDiff", "First offset difference", FILE, TYPE_GAUGE),
     SECOND_OFFSET_DIFF("secondOffsetDiff", "Second offset difference", FILE, TYPE_GAUGE);
 
