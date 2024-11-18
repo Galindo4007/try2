@@ -19,7 +19,7 @@
 
 package org.apache.hadoop.fs.azurebfs.utils;
 
-public class StringUtils {
+public final class StringUtils {
 
     /**
      * Formats a double value to a string with three decimal places.

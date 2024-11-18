@@ -359,7 +359,8 @@ public class AbfsReadFooterMetrics extends AbstractAbfsStatisticsSource {
         }
 
         String sizeReadByFirstRead = formatWithPrecision(getMetricValue(fileType, SIZE_READ_BY_FIRST_READ) / (double) totalFiles);
-        String offsetDiffBetweenFirstAndSecondRead = formatWithPrecision(getMetricValue(fileType, OFFSET_DIFF_BETWEEN_FIRST_AND_SECOND_READ) / (double) totalFiles);
+        String offsetDiffBetweenFirstAndSecondRead = formatWithPrecision(getMetricValue(fileType,
+                OFFSET_DIFF_BETWEEN_FIRST_AND_SECOND_READ) / (double) totalFiles);
 
         if (NON_PARQUET.equals(fileType)) {
             sizeReadByFirstRead += "_" + formatWithPrecision(getMetricValue(fileType, FIRST_OFFSET_DIFF) / (double) totalFiles);
