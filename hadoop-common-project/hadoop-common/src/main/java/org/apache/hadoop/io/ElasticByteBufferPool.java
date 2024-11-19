@@ -126,7 +126,5 @@ public abstract class ElasticByteBufferPool implements ByteBufferPool {
    */
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
-  public int size(boolean direct) {
-    return getBufferTree(direct).size();
-  }
+  public abstract int getCurrentBuffersCount(boolean direct);
 }
