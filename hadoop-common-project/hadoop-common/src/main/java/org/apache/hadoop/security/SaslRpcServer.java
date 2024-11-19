@@ -232,7 +232,7 @@ public class SaslRpcServer {
 
     /** The code for this method. */
     public final byte code;
-    public final Supplier<String> mechanismName;
+    private final Supplier<String> mechanismName;
 
     private AuthMethod(byte code, String mechanismName) { 
       this(code, () -> mechanismName);
