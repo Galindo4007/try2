@@ -1317,6 +1317,9 @@ public final class S3AUtils {
      LOG.debug("Signer override = {}", signerOverride);
       awsConf.setSignerOverride(signerOverride);
     }
+    boolean expectContinueEnabled = conf.getBoolean(CONNECTION_EXPECT_CONTINUE,
+            CONNECTION_EXPECT_CONTINUE_DEFAULT);
+    awsConf.setUseExpectContinue(expectContinueEnabled);
   }
 
   /**

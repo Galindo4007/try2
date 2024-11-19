@@ -18,18 +18,64 @@
 
 package org.apache.hadoop.fs.contract.s3a;
 
+import java.util.Arrays;
+import java.util.Collection;
+
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractCreateTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
+import org.apache.hadoop.fs.s3a.S3ATestUtils;
+
+import static org.apache.hadoop.fs.s3a.Constants.CONNECTION_EXPECT_CONTINUE;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.removeBaseAndBucketOverrides;
 
 /**
  * S3A contract tests creating files.
  */
+@RunWith(Parameterized.class)
 public class ITestS3AContractCreate extends AbstractContractCreateTest {
+
+  /**
+   * This test suite is parameterized for the different create file
+   * options.
+   * @return a list of test parameters.
+   */
+  @Parameterized.Parameters
+  public static Collection<Object[]> params() {
+    return Arrays.asList(new Object[][]{
+        {false},
+        {true}
+    });
+  }
+
+  /**
+   * Expect a 100-continue response?
+   */
+  private final boolean expectContinue;
+
+  public ITestS3AContractCreate(final boolean expectContinue) {
+    this.expectContinue = expectContinue;
+  }
 
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
     return new S3AContract(conf);
+  }
+
+  @Override
+  protected Configuration createConfiguration() {
+    final Configuration conf =
+        super.createConfiguration();
+
+    removeBaseAndBucketOverrides(
+        conf,
+        CONNECTION_EXPECT_CONTINUE);
+    conf.setBoolean(CONNECTION_EXPECT_CONTINUE, expectContinue);
+    S3ATestUtils.disableFilesystemCaching(conf);
+    return conf;
   }
 
 }

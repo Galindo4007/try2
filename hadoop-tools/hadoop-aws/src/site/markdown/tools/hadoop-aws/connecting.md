@@ -118,6 +118,19 @@ See [Timeouts](performance.html#timeouts).
 </property>
 
 <property>
+  <name>fs.s3a.connection.expect.continue</name>
+  <value>true</value>
+  <description>
+    Should PUT requests await a 100 CONTINUE responses before uploading
+    data?
+    This should normally be left alone unless a third party store which
+    does not support it is encountered, or file upload over long
+    distance networks time out.
+    (see HADOOP-19317 as an example)
+  </description>
+</property>
+
+<property>
   <name>fs.s3a.connection.ssl.enabled</name>
   <value>true</value>
   <description>

@@ -574,4 +574,23 @@ public class ITestS3AConfiguration {
         .assertEquals(signerOverride, clientConfiguration.getSignerOverride());
   }
 
+  @Test(timeout = 10_000L)
+  public void testExpectContinueFalse() throws Exception {
+    Configuration config = new Configuration(false);
+    config.setBoolean(CONNECTION_EXPECT_CONTINUE, false);
+    ClientConfiguration awsConf = new ClientConfiguration();
+    initConnectionSettings(config, awsConf);
+    Assertions.assertThat(awsConf.isUseExpectContinue())
+        .describedAs("expect continue flag")
+        .isFalse();
+  }
+
+  @Test(timeout = 10_000L)
+  public void testExpectContinueDefault() throws Exception {
+    ClientConfiguration awsConf = new ClientConfiguration();
+    initConnectionSettings(new Configuration(false), awsConf);
+    Assertions.assertThat(awsConf.isUseExpectContinue())
+        .describedAs("expect continue flag")
+        .isTrue();
+  }
 }
