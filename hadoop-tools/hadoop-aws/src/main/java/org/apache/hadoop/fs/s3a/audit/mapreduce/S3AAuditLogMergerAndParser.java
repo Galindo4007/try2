@@ -277,7 +277,7 @@ public class S3AAuditLogMergerAndParser {
 
             // Instantiating generated AvroDataRecord class
             AvroS3LogEntryRecord avroDataRecord = buildLogRecord(auditLogMap);
-            if (!avroDataRecord.referrerMap.isEmpty()) {
+            if (!avroDataRecord.getReferrerMap().isEmpty()) {
               referrerHeaderLogParsed++;
             }
             avroWriter.append(avroDataRecord);
