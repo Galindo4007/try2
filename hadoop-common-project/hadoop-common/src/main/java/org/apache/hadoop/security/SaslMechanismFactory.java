@@ -36,9 +36,9 @@ public final class SaslMechanismFactory {
   static final Logger LOG = LoggerFactory.getLogger(SaslMechanismFactory.class);
 
   private static final String SASL_MECHANISM_ENV = "HADOOP_SASL_MECHANISM";
-  private static final String SASL_MECHANISM;
+  private static volatile String SASL_MECHANISM;
 
-  static {
+  private static synchronized String getSynchronously() {
     // env
     final String envValue = System.getenv(SASL_MECHANISM_ENV);
     LOG.debug("{} = {} (env)", SASL_MECHANISM_ENV, envValue);
@@ -61,10 +61,12 @@ public final class SaslMechanismFactory {
         : confValue != null ? confValue
         : HADOOP_SECURITY_SASL_MECHANISM_DEFAULT;
     LOG.debug("SASL_MECHANISM = {} (effective)", SASL_MECHANISM);
+    return SASL_MECHANISM;
   }
 
   public static String getMechanism() {
-    return SASL_MECHANISM;
+    final String value = SASL_MECHANISM;
+    return value != null ? value : getSynchronously();
   }
 
   public static boolean isDefaultMechanism(String mechanism) {

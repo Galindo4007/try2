@@ -23,13 +23,13 @@ import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.security.Security;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
@@ -42,8 +42,6 @@ import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
 import javax.security.sasl.SaslServerFactory;
 
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -222,35 +220,19 @@ public class SaslRpcServer {
     return fullName.split("[/@]");
   }
 
-  private static String getMechanism() {
-    // use reflection to avoid loading the class
-    final String className = "org.apache.hadoop.security.SaslMechanismFactory";
-    final String methodName = "getMechanism";
-    try {
-      final Method method = Class.forName(className).getMethod(methodName);
-      return method.invoke(null).toString();
-    } catch (Exception e) {
-      throw new IllegalStateException("Failed to invoke " + methodName + " from " + className, e);
-    }
-  }
-
-  /** Memoize the mechanism value. */
-  private static final Supplier<String> MECHANISM_SUPPLIER
-      = Suppliers.memoize(SaslRpcServer::getMechanism);
-
   /** Authentication method */
   @InterfaceStability.Evolving
   public enum AuthMethod {
     SIMPLE((byte) 80, ""),
     KERBEROS((byte) 81, "GSSAPI"),
     @Deprecated
-    DIGEST((byte) 82, MECHANISM_SUPPLIER),
-    TOKEN((byte) 82, MECHANISM_SUPPLIER),
+    DIGEST((byte) 82, SaslMechanismFactory::getMechanism),
+    TOKEN((byte) 82, SaslMechanismFactory::getMechanism),
     PLAIN((byte) 83, "PLAIN");
 
     /** The code for this method. */
     public final byte code;
-    private final Supplier<String> mechanismName;
+    public final Supplier<String> mechanismName;
 
     private AuthMethod(byte code, String mechanismName) { 
       this(code, () -> mechanismName);
@@ -259,6 +241,8 @@ public class SaslRpcServer {
     AuthMethod(byte code, Supplier<String> mechanismName) {
       this.code = code;
       this.mechanismName = mechanismName;
+      LOG.debug("{} {}: code={}, mechanism=\"{}\"",
+          getClass().getSimpleName(), name(), code, mechanismName);
     }
 
     private static final int FIRST_CODE = values()[0].code;
