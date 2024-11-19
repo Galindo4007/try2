@@ -155,7 +155,7 @@ See [Timeouts](performance.html#timeouts).
 The S3A connector uses [Apache HttpClient](https://hc.apache.org/index.html) to connect to
 S3 Stores.
 The client is configured to create a pool of HTTP connections with S3, so that once
-the initial set of connections have been made they can re-used for followup operations.
+the initial set of connections have been made they can be re-used for followup operations.
 
 Core aspects of pool settings are:
 * The pool size is set by `fs.s3a.connection.maximum` -if a process asks for more connections than this then
