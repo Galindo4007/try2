@@ -20,10 +20,6 @@ package org.apache.hadoop.io;
 import org.apache.hadoop.thirdparty.com.google.common.collect.ComparisonChain;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 
-import java.nio.ByteBuffer;
-import java.util.Map;
-import java.util.TreeMap;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -73,48 +69,6 @@ public abstract class ElasticByteBufferPool implements ByteBufferPool {
           append(capacity).
           append(insertionTime).
           toHashCode();
-    }
-  }
-
-  private final TreeMap<Key, ByteBuffer> buffers =
-      new TreeMap<Key, ByteBuffer>();
-
-  private final TreeMap<Key, ByteBuffer> directBuffers =
-      new TreeMap<Key, ByteBuffer>();
-
-  private final TreeMap<Key, ByteBuffer> getBufferTree(boolean direct) {
-    return direct ? directBuffers : buffers;
-  }
-
-  @Override
-  public synchronized ByteBuffer getBuffer(boolean direct, int length) {
-    TreeMap<Key, ByteBuffer> tree = getBufferTree(direct);
-    Map.Entry<Key, ByteBuffer> entry =
-        tree.ceilingEntry(new Key(length, 0));
-    if (entry == null) {
-      return direct ? ByteBuffer.allocateDirect(length) :
-                      ByteBuffer.allocate(length);
-    }
-    tree.remove(entry.getKey());
-    entry.getValue().clear();
-    return entry.getValue();
-  }
-
-  @Override
-  public synchronized void putBuffer(ByteBuffer buffer) {
-    buffer.clear();
-    TreeMap<Key, ByteBuffer> tree = getBufferTree(buffer.isDirect());
-    while (true) {
-      Key key = new Key(buffer.capacity(), System.nanoTime());
-      if (!tree.containsKey(key)) {
-        tree.put(key, buffer);
-        return;
-      }
-      // Buffers are indexed by (capacity, time).
-      // If our key is not unique on the first try, we try again, since the
-      // time will be different.  Since we use nanoseconds, it's pretty
-      // unlikely that we'll loop even once, unless the system clock has a
-      // poor granularity.
     }
   }
 
