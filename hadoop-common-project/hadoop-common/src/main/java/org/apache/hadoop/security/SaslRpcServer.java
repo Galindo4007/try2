@@ -241,8 +241,6 @@ public class SaslRpcServer {
     AuthMethod(byte code, Supplier<String> mechanismName) {
       this.code = code;
       this.mechanismName = mechanismName;
-      LOG.debug("{} {}: code={}, mechanism=\"{}\"",
-          getClass().getSimpleName(), name(), code, mechanismName);
     }
 
     private static final int FIRST_CODE = values()[0].code;

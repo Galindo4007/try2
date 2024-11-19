@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.security;
 
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -49,14 +48,7 @@ public final class SaslMechanismFactory {
         HADOOP_SECURITY_SASL_MECHANISM_DEFAULT);
     LOG.debug("{} = {} (conf)", HADOOP_SECURITY_SASL_MECHANISM_KEY, confValue);
 
-    if (envValue != null && confValue != null) {
-      if (!envValue.equals(confValue)) {
-        throw new HadoopIllegalArgumentException("SASL Mechanism mismatched: env "
-            + SASL_MECHANISM_ENV + " is " + envValue + " but conf "
-            + HADOOP_SECURITY_SASL_MECHANISM_KEY + " is " + confValue);
-      }
-    }
-
+    // env has a higher precedence than conf
     mechanism = envValue != null ? envValue
         : confValue != null ? confValue
         : HADOOP_SECURITY_SASL_MECHANISM_DEFAULT;
@@ -69,8 +61,8 @@ public final class SaslMechanismFactory {
     return value != null ? value : getSynchronously();
   }
 
-  public static boolean isDefaultMechanism(String mechanism) {
-    return HADOOP_SECURITY_SASL_MECHANISM_DEFAULT.equals(mechanism);
+  public static boolean isDefaultMechanism(String saslMechanism) {
+    return HADOOP_SECURITY_SASL_MECHANISM_DEFAULT.equals(saslMechanism);
   }
 
   private SaslMechanismFactory() {}
