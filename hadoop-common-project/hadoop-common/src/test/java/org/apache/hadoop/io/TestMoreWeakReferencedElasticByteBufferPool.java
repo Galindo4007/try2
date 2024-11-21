@@ -36,7 +36,7 @@ public class TestMoreWeakReferencedElasticByteBufferPool
 
   @Test
   public void testMixedBuffersInPool() {
-    WeakReferencedElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
+    ElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
     ByteBuffer buffer1 = pool.getBuffer(true, 5);
     ByteBuffer buffer2 = pool.getBuffer(true, 10);
     ByteBuffer buffer3 = pool.getBuffer(false, 5);
@@ -60,7 +60,7 @@ public class TestMoreWeakReferencedElasticByteBufferPool
 
   @Test
   public void testUnexpectedBufferSizes() throws Exception {
-    WeakReferencedElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
+    ElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
     ByteBuffer buffer1 = pool.getBuffer(true, 0);
 
     // try writing a random byte in a 0 length buffer.
@@ -84,7 +84,7 @@ public class TestMoreWeakReferencedElasticByteBufferPool
    * @param numDirectBuffersExpected expected number of direct buffers.
    * @param numHeapBuffersExpected expected number of heap buffers.
    */
-  private void assertBufferCounts(WeakReferencedElasticByteBufferPool pool,
+  private void assertBufferCounts(ElasticByteBufferPool pool,
                                   int numDirectBuffersExpected,
                                   int numHeapBuffersExpected) {
     Assertions.assertThat(pool.getCurrentBuffersCount(true))
