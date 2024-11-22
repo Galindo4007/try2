@@ -28,10 +28,15 @@ import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
@@ -282,20 +287,18 @@ public class RunJar {
 
     final File workDir;
     try {
-      workDir = File.createTempFile("hadoop-unjar", "", tmpDir);
-    } catch (IOException ioe) {
+      FileAttribute<Set<PosixFilePermission>> perms = PosixFilePermissions
+              .asFileAttribute(PosixFilePermissions.fromString("rwx------"));
+      workDir = Files.createTempDirectory(tmpDir.toPath(), "hadoop-unjar", perms).toFile();
+    } catch (IOException | SecurityException e) {
       // If user has insufficient perms to write to tmpDir, default
       // "Permission denied" message doesn't specify a filename.
       System.err.println("Error creating temp dir in java.io.tmpdir "
-                         + tmpDir + " due to " + ioe.getMessage());
+              + tmpDir + " due to " + e.getMessage());
       System.exit(-1);
       return;
     }
 
-    if (!workDir.delete()) {
-      System.err.println("Delete failed for " + workDir);
-      System.exit(-1);
-    }
     ensureDirectory(workDir);
 
     ShutdownHookManager.get().addShutdownHook(
@@ -391,3 +394,4 @@ public class RunJar {
     return System.getenv(HADOOP_CLIENT_CLASSLOADER_SYSTEM_CLASSES);
   }
 }
+
