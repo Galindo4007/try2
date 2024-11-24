@@ -72,6 +72,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.protocolPB.AsyncRpcProtocolPBUtil;
@@ -397,7 +398,8 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
         NotReplicatedYetException.class,
         IOException.class,
         ConnectException.class,
-        RetriableException.class);
+        RetriableException.class,
+        PathIsNotEmptyDirectoryException.class);
 
     this.rpcServer.addSuppressedLoggingExceptions(
         StandbyException.class, UnresolvedPathException.class);
