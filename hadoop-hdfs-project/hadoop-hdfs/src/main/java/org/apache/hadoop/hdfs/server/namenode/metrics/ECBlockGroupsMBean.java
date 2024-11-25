@@ -58,7 +58,7 @@ public interface ECBlockGroupsMBean {
   long getPendingDeletionECBlocks();
 
   /**
-   * @return total number of erasure coded block groups.
+   * Return total number of erasure coded block groups.
    */
   long getTotalECBlockGroups();
 
