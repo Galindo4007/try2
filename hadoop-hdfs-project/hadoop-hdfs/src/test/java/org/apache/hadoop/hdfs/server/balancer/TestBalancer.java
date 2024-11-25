@@ -673,6 +673,7 @@ public class TestBalancer {
     LOG.info("newCapacity= " +  newCapacity);
     LOG.info("newRack    = " +  newRack);
     LOG.info("useTool    = " +  useTool);
+    LOG.info("useFile    = " +  useFile);
     assertEquals(capacities.length, racks.length);
     int numOfDatanodes = capacities.length;
 
