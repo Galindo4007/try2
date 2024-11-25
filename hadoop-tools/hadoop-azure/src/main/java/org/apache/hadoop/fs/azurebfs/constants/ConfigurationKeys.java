@@ -258,6 +258,10 @@ public final class ConfigurationKeys {
   public static final String FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT = "fs.azure.account.oauth2.msi.endpoint";
   /** Key for oauth msi Authority: {@value}. */
   public static final String FS_AZURE_ACCOUNT_OAUTH_MSI_AUTHORITY = "fs.azure.account.oauth2.msi.authority";
+  /** Key for oauth msi endpoint api version: {@value}. */
+  public static final String FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT_API_VERSION = "fs.azure.account.oauth2.msi.endpoint.api.version";
+  /** Key for oauth arc msi endpoint api version: {@value}. */
+  public static final String FS_AZURE_ACCOUNT_OAUTH_ARC_MSI_ENDPOINT_API_VERSION = "fs.azure.account.oauth2.arc.msi.endpoint.api.version";
   /** Key for oauth user name: {@value}. */
   public static final String FS_AZURE_ACCOUNT_OAUTH_USER_NAME = "fs.azure.account.oauth2.user.name";
   /** Key for oauth user password: {@value}. */

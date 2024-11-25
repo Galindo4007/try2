@@ -18,15 +18,15 @@
 
 package org.apache.hadoop.fs.azurebfs.oauth2;
 
-import java.io.IOException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 
 /**
  * Provides tokens based on Azure VM's Managed Service Identity.
  */
-public class MsiTokenProvider extends AccessTokenProvider {
+public class ArcMsiTokenProvider extends AccessTokenProvider {
 
   private final String authEndpoint;
 
@@ -44,8 +44,8 @@ public class MsiTokenProvider extends AccessTokenProvider {
 
   private static final Logger LOG = LoggerFactory.getLogger(AccessTokenProvider.class);
 
-  public MsiTokenProvider(final String authEndpoint, final String apiVersion, final String tenantGuid,
-      final String clientId, final String authority) {
+  public ArcMsiTokenProvider(final String authEndpoint, final String apiVersion, final String tenantGuid,
+                             final String clientId, final String authority) {
     this.authEndpoint = authEndpoint;
     this.tenantGuid = tenantGuid;
     this.clientId = clientId;
@@ -55,9 +55,9 @@ public class MsiTokenProvider extends AccessTokenProvider {
 
   @Override
   protected AzureADToken refreshToken() throws IOException {
-    LOG.debug("AADToken: refreshing token from MSI");
+    LOG.debug("AADToken: refreshing token from ARC MSI");
     AzureADToken token = AzureADAuthenticator
-        .getTokenFromMsi(authEndpoint, apiVersion, tenantGuid, clientId, authority, false);
+        .getTokenFromArcMsi(authEndpoint, apiVersion, tenantGuid, clientId, authority, false);
     tokenFetchTime = System.currentTimeMillis();
     return token;
   }
@@ -83,7 +83,7 @@ public class MsiTokenProvider extends AccessTokenProvider {
     // In case of, Token is not refreshed for 1 hr or any clock skew issues,
     // refresh token.
     if (expiring) {
-      LOG.debug("MSIToken: token renewing. Time elapsed since last token fetch:"
+      LOG.debug("ARCMSIToken: token renewing. Time elapsed since last token fetch:"
           + " {} milli seconds", elapsedTimeSinceLastTokenRefreshInMillis);
     }
 

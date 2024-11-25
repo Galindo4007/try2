@@ -43,6 +43,14 @@ public final class AuthConfigurations {
   public static final String
       DEFAULT_FS_AZURE_ACCOUNT_OAUTH_TOKEN_FILE =
       "/var/run/secrets/azure/tokens/azure-identity-token";
+  /** Default OAuth api-version end point for the MSI flow. */
+  public static final String
+      DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT_API_VERSION =
+      "2018-02-01";
+  /** Default OAuth api-version end point for the ARC MSI flow. */
+  public static final String
+      DEFAULT_FS_AZURE_ACCOUNT_OAUTH_ARC_MSI_ENDPOINT_API_VERSION =
+      "2021-02-01";
 
   private AuthConfigurations() {
   }

@@ -57,6 +57,7 @@ import org.apache.hadoop.fs.azurebfs.oauth2.AccessTokenProvider;
 import org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider;
 import org.apache.hadoop.fs.azurebfs.oauth2.CustomTokenProviderAdapter;
 import org.apache.hadoop.fs.azurebfs.oauth2.MsiTokenProvider;
+import org.apache.hadoop.fs.azurebfs.oauth2.ArcMsiTokenProvider;
 import org.apache.hadoop.fs.azurebfs.oauth2.RefreshTokenBasedTokenProvider;
 import org.apache.hadoop.fs.azurebfs.oauth2.UserPasswordTokenProvider;
 import org.apache.hadoop.fs.azurebfs.oauth2.WorkloadIdentityTokenProvider;
@@ -961,6 +962,9 @@ public class AbfsConfiguration{
           String authEndpoint = getTrimmedPasswordString(
               FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT,
               AuthConfigurations.DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT);
+          String apiVersion = getTrimmedPasswordString(
+              FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT_API_VERSION,
+              AuthConfigurations.DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT_API_VERSION);
           String tenantGuid =
               getPasswordString(FS_AZURE_ACCOUNT_OAUTH_MSI_TENANT);
           String clientId =
@@ -969,9 +973,27 @@ public class AbfsConfiguration{
               FS_AZURE_ACCOUNT_OAUTH_MSI_AUTHORITY,
               AuthConfigurations.DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_AUTHORITY);
           authority = appendSlashIfNeeded(authority);
-          tokenProvider = new MsiTokenProvider(authEndpoint, tenantGuid,
+          tokenProvider = new MsiTokenProvider(authEndpoint, apiVersion, tenantGuid,
               clientId, authority);
           LOG.trace("MsiTokenProvider initialized");
+        } else if (tokenProviderClass == ArcMsiTokenProvider.class) {
+          String authEndpoint = getTrimmedPasswordString(
+                  FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT,
+                  AuthConfigurations.DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT);
+          String apiVersion = getTrimmedPasswordString(
+                  FS_AZURE_ACCOUNT_OAUTH_ARC_MSI_ENDPOINT_API_VERSION,
+                  AuthConfigurations.DEFAULT_FS_AZURE_ACCOUNT_OAUTH_ARC_MSI_ENDPOINT_API_VERSION);
+          String tenantGuid =
+                  getPasswordString(FS_AZURE_ACCOUNT_OAUTH_MSI_TENANT);
+          String clientId =
+                  getPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_ID);
+          String authority = getTrimmedPasswordString(
+                  FS_AZURE_ACCOUNT_OAUTH_MSI_AUTHORITY,
+                  AuthConfigurations.DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_AUTHORITY);
+          authority = appendSlashIfNeeded(authority);
+          tokenProvider = new ArcMsiTokenProvider(authEndpoint, apiVersion, tenantGuid,
+                  clientId, authority);
+          LOG.trace("ArcMsiTokenProvider initialized");
         } else if (tokenProviderClass == RefreshTokenBasedTokenProvider.class) {
           String authEndpoint = getTrimmedPasswordString(
               FS_AZURE_ACCOUNT_OAUTH_REFRESH_TOKEN_ENDPOINT,

@@ -21,6 +21,8 @@ package org.apache.hadoop.fs.azurebfs.oauth2;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -169,11 +171,11 @@ public final class AzureADAuthenticator {
    * @return {@link AzureADToken} obtained using the creds
    * @throws IOException throws IOException if there is a failure in obtaining the token
    */
-  public static AzureADToken getTokenFromMsi(final String authEndpoint,
+  public static AzureADToken getTokenFromMsi(final String authEndpoint, final String apiVersion,
       final String tenantGuid, final String clientId, String authority,
       boolean bypassCache) throws IOException {
     QueryParams qp = new QueryParams();
-    qp.add("api-version", "2018-02-01");
+    qp.add("api-version", apiVersion);
     qp.add("resource", RESOURCE_NAME);
 
     if (tenantGuid != null && tenantGuid.length() > 0) {
@@ -194,7 +196,51 @@ public final class AzureADAuthenticator {
     headers.put("Metadata", "true");
 
     LOG.debug("AADToken: starting to fetch token using MSI");
-    return getTokenCall(authEndpoint, qp.serialize(), headers, "GET", true);
+    return getTokenCall(authEndpoint, qp.serialize(), headers, "GET", true, false);
+  }
+
+  /**
+   * Gets AAD token from the local virtual machine's ARC extension. This only works on
+   * an Azure VM with MSI extension
+   * enabled.
+   *
+   * @param authEndpoint the OAuth 2.0 token endpoint associated
+   *                     with the user's directory (obtain from
+   *                     Active Directory configuration)
+   * @param tenantGuid  (optional) The guid of the AAD tenant. Can be {@code null}.
+   * @param clientId    (optional) The clientId guid of the MSI service
+   *                    principal to use. Can be {@code null}.
+   * @param bypassCache {@code boolean} specifying whether a cached token is acceptable or a fresh token
+   *                    request should me made to AAD
+   * @return {@link AzureADToken} obtained using the creds
+   * @throws IOException throws IOException if there is a failure in obtaining the token
+   */
+  public static AzureADToken getTokenFromArcMsi(final String authEndpoint, final String apiVersion,
+       final String tenantGuid, final String clientId, String authority,
+       boolean bypassCache) throws IOException {
+    QueryParams qp = new QueryParams();
+    qp.add("api-version", apiVersion);
+    qp.add("resource", RESOURCE_NAME);
+
+    if (tenantGuid != null && tenantGuid.length() > 0) {
+      authority = authority + tenantGuid;
+      LOG.debug("MSI authority : {}", authority);
+      qp.add("authority", authority);
+    }
+
+    if (clientId != null && clientId.length() > 0) {
+      qp.add("client_id", clientId);
+    }
+
+    if (bypassCache) {
+      qp.add("bypass_cache", "true");
+    }
+
+    Hashtable<String, String> headers = new Hashtable<>();
+    headers.put("Metadata", "true");
+
+    LOG.debug("AADToken: starting to fetch token using MSI from ARC");
+    return getTokenCall(authEndpoint, qp.serialize(), headers, "GET", true, true);
   }
 
   /**
@@ -327,11 +373,11 @@ public final class AzureADAuthenticator {
 
   private static AzureADToken getTokenCall(String authEndpoint, String body,
       Hashtable<String, String> headers, String httpMethod) throws IOException {
-    return getTokenCall(authEndpoint, body, headers, httpMethod, false);
+    return getTokenCall(authEndpoint, body, headers, httpMethod, false, false);
   }
 
   private static AzureADToken getTokenCall(String authEndpoint, String body,
-      Hashtable<String, String> headers, String httpMethod, boolean isMsi)
+      Hashtable<String, String> headers, String httpMethod, boolean isMsi, boolean isArc)
       throws IOException {
     AzureADToken token = null;
 
@@ -346,7 +392,7 @@ public final class AzureADAuthenticator {
       httperror = 0;
       ex = null;
       try {
-        token = getTokenSingleCall(authEndpoint, body, headers, httpMethod, isMsi);
+        token = getTokenSingleCall(authEndpoint, body, headers, httpMethod, isMsi, isArc);
       } catch (HttpException e) {
         httperror = e.httpErrorCode;
         ex = e;
@@ -385,16 +431,81 @@ public final class AzureADAuthenticator {
 
   private static AzureADToken getTokenSingleCall(String authEndpoint,
       String payload, Hashtable<String, String> headers, String httpMethod,
-      boolean isMsi)
+      boolean isMsi, boolean isArc)
           throws IOException {
 
     AzureADToken token = null;
     HttpURLConnection conn = null;
     String urlString = authEndpoint;
+    String challengerToken = null;
 
     httpMethod = (httpMethod == null) ? "POST" : httpMethod;
     if (httpMethod.equals("GET")) {
       urlString = urlString + "?" + payload;
+    }
+
+    if (isArc) {
+      // Currently there is a known flow that ARC needs obtain a challenge token first
+      // before and in order to get access_token from the same MSI endpoint
+      try{
+        LOG.debug("Requesting a challenge token by {} to {}",
+                httpMethod, authEndpoint);
+        URL url = new URL(urlString);
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod(httpMethod);
+        conn.setReadTimeout(READ_TIMEOUT);
+        conn.setConnectTimeout(CONNECT_TIMEOUT);
+
+        if (headers != null && headers.size() > 0) {
+          for (Map.Entry<String, String> entry : headers.entrySet()) {
+            conn.setRequestProperty(entry.getKey(), entry.getValue());
+          }
+        }
+        conn.setRequestProperty("Connection", "close");
+        AbfsIoUtils.dumpHeadersToDebugLog("Request Headers",
+                conn.getRequestProperties());
+        if (httpMethod.equals("POST")) {
+          conn.setDoOutput(true);
+          conn.getOutputStream().write(payload.getBytes(StandardCharsets.UTF_8));
+        }
+        AbfsIoUtils.dumpHeadersToDebugLog("Response Headers",
+                conn.getHeaderFields());
+
+        int httpResponseCode = conn.getResponseCode();
+        String requestId = conn.getHeaderField("x-ms-request-id");
+        String responseContentType = conn.getHeaderField("Content-Type");
+        String operation = "Challenge Token: HTTP connection to " + authEndpoint
+                + " failed for getting challenge token from ARC MSI endpoint.";
+        InputStream stream = conn.getErrorStream();
+        if (stream == null) {
+          // no error stream, try the original input stream
+          stream = conn.getInputStream();
+        }
+        String responseBody = consumeInputStream(stream, 1024);
+
+        String authHeader = conn.getHeaderField("Www-Authenticate");
+        if (authHeader != null) {
+          // Extract the challenge token path
+          int index = authHeader.indexOf('=');
+          if (index != -1) {
+            String authHeaderPath = authHeader.substring(index + 1).trim();
+            try (BufferedReader reader = new BufferedReader(new FileReader(authHeaderPath))) {
+              challengerToken = reader.readLine().trim();
+            }
+          }
+        } else {
+          throw new HttpException(httpResponseCode,
+            requestId,
+            operation,
+            authEndpoint,
+            responseContentType,
+            responseBody);
+        }
+      } finally {
+        if (conn != null) {
+          conn.disconnect();
+        }
+      }
     }
 
     try {
@@ -405,6 +516,10 @@ public final class AzureADAuthenticator {
       conn.setRequestMethod(httpMethod);
       conn.setReadTimeout(READ_TIMEOUT);
       conn.setConnectTimeout(CONNECT_TIMEOUT);
+
+      if (isArc) {
+        conn.setRequestProperty("Authorization", "Basic " + challengerToken);
+      }
 
       if (headers != null && headers.size() > 0) {
         for (Map.Entry<String, String> entry : headers.entrySet()) {

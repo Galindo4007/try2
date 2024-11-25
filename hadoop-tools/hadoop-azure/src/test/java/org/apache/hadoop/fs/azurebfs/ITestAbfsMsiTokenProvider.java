@@ -21,6 +21,7 @@ package org.apache.hadoop.fs.azurebfs;
 import java.io.IOException;
 import java.util.Date;
 
+import org.apache.hadoop.fs.azurebfs.constants.AuthConfigurations;
 import org.junit.Test;
 
 import org.apache.commons.lang3.StringUtils;
@@ -28,6 +29,7 @@ import org.apache.hadoop.fs.azurebfs.oauth2.AccessTokenProvider;
 import org.apache.hadoop.fs.azurebfs.oauth2.AzureADToken;
 import org.apache.hadoop.fs.azurebfs.oauth2.MsiTokenProvider;
 
+import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.*;
 import static org.junit.Assume.assumeThat;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
@@ -36,10 +38,7 @@ import static org.hamcrest.Matchers.isEmptyString;
 
 import static org.apache.hadoop.fs.azurebfs.constants.AuthConfigurations.DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_AUTHORITY;
 import static org.apache.hadoop.fs.azurebfs.constants.AuthConfigurations.DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT;
-import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_OAUTH_CLIENT_ID;
-import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_OAUTH_MSI_AUTHORITY;
-import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT;
-import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_OAUTH_MSI_TENANT;
+import static org.apache.hadoop.fs.azurebfs.constants.AuthConfigurations.DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT_API_VERSION;
 
 /**
  * Test MsiTokenProvider.
@@ -56,6 +55,8 @@ public final class ITestAbfsMsiTokenProvider
     AbfsConfiguration conf = getConfiguration();
     assumeThat(conf.get(FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT),
         not(isEmptyOrNullString()));
+    assumeThat(conf.get(FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT_API_VERSION),
+        not(isEmptyOrNullString()));
     assumeThat(conf.get(FS_AZURE_ACCOUNT_OAUTH_MSI_TENANT),
         not(isEmptyOrNullString()));
     assumeThat(conf.get(FS_AZURE_ACCOUNT_OAUTH_CLIENT_ID),
@@ -69,10 +70,13 @@ public final class ITestAbfsMsiTokenProvider
     String authEndpoint = getTrimmedPasswordString(conf,
         FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT,
         DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT);
+    String apiVersion = getTrimmedPasswordString(conf,
+        FS_AZURE_ACCOUNT_OAUTH_ARC_MSI_ENDPOINT_API_VERSION,
+        DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT_API_VERSION);
     String authority = getTrimmedPasswordString(conf,
         FS_AZURE_ACCOUNT_OAUTH_MSI_AUTHORITY,
         DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_AUTHORITY);
-    AccessTokenProvider tokenProvider = new MsiTokenProvider(authEndpoint,
+    AccessTokenProvider tokenProvider = new MsiTokenProvider(authEndpoint, apiVersion,
         tenantGuid, clientId, authority);
 
     AzureADToken token = null;
