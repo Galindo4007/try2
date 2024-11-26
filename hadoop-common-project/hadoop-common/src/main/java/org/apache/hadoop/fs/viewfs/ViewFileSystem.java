@@ -28,6 +28,7 @@ import static org.apache.hadoop.fs.viewfs.Constants.PERMISSION_555;
 import static org.apache.hadoop.fs.viewfs.Constants.CONFIG_VIEWFS_TRASH_FORCE_INSIDE_MOUNT_POINT;
 import static org.apache.hadoop.fs.viewfs.Constants.CONFIG_VIEWFS_TRASH_FORCE_INSIDE_MOUNT_POINT_DEFAULT;
 
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -45,7 +46,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -118,9 +118,8 @@ public class ViewFileSystem extends FileSystem {
    * Caching children filesystems. HADOOP-15565.
    */
   static class InnerCache {
-    private Map<Key, FileSystem> map = new HashMap<>();
+    private ConcurrentHashMap<Key, FileSystem> map = new ConcurrentHashMap<>();
     private FsGetter fsCreator;
-    private ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
     InnerCache(FsGetter fsCreator) {
       this.fsCreator = fsCreator;
@@ -128,28 +127,13 @@ public class ViewFileSystem extends FileSystem {
 
     FileSystem get(URI uri, Configuration config) throws IOException {
       Key key = new Key(uri);
-      FileSystem fs = null;
-      try {
-        rwLock.readLock().lock();
-        fs = map.get(key);
-        if (fs != null) {
-          return fs;
-        }
-      } finally {
-        rwLock.readLock().unlock();
+      if (map.contains(key)) {
+        return map.get(key);
       }
-      try {
-        rwLock.writeLock().lock();
-        fs = map.get(key);
-        if (fs != null) {
-          return fs;
-        }
-        fs = fsCreator.getNewInstance(uri, config);
-        map.put(key, fs);
-        return fs;
-      } finally {
-        rwLock.writeLock().unlock();
-      }
+
+      FileSystem fs = fsCreator.getNewInstance(uri, config);
+      map.putIfAbsent(key, fs);
+      return fs;
     }
 
     void closeAll() {
@@ -163,12 +147,7 @@ public class ViewFileSystem extends FileSystem {
     }
 
     void clear() {
-      try {
-        rwLock.writeLock().lock();
         map.clear();
-      } finally {
-        rwLock.writeLock().unlock();
-      }
     }
 
     /**
