@@ -125,14 +125,27 @@ public class ViewFileSystem extends FileSystem {
       this.fsCreator = fsCreator;
     }
 
+    // computeIfAbsent() does not support a mapping function which throws IOException.
+    // Wrap fsCreator.getNewInstance() to not throw IOException and return null instead.
+    FileSystem getNewFileSystem(FsGetter fsCreator, URI uri, Configuration config) {
+      try {
+        return fsCreator.getNewInstance(uri, config);
+      } catch (IOException e) {
+        LOG.error("Failed to create new FileSystem instance for " + uri, e);
+        return null;
+      }
+    }
+
     FileSystem get(URI uri, Configuration config) throws IOException {
       Key key = new Key(uri);
       if (map.contains(key)) {
         return map.get(key);
       }
 
-      FileSystem fs = fsCreator.getNewInstance(uri, config);
-      map.putIfAbsent(key, fs);
+      FileSystem fs = map.computeIfAbsent(key, k -> getNewFileSystem(fsCreator, uri, config));
+      if (fs == null) {
+        throw new IOException("Failed to create new FileSystem instance for " + uri);
+      }
       return fs;
     }
 
