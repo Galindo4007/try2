@@ -29,6 +29,7 @@ import static org.apache.hadoop.fs.viewfs.Constants.CONFIG_VIEWFS_TRASH_FORCE_IN
 import static org.apache.hadoop.fs.viewfs.Constants.CONFIG_VIEWFS_TRASH_FORCE_INSIDE_MOUNT_POINT_DEFAULT;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -118,7 +119,7 @@ public class ViewFileSystem extends FileSystem {
    * Caching children filesystems. HADOOP-15565.
    */
   static class InnerCache {
-    private ConcurrentHashMap<Key, FileSystem> map = new ConcurrentHashMap<>();
+    private ConcurrentMap<Key, FileSystem> map = new ConcurrentHashMap<>();
     private FsGetter fsCreator;
 
     InnerCache(FsGetter fsCreator) {
@@ -138,9 +139,6 @@ public class ViewFileSystem extends FileSystem {
 
     FileSystem get(URI uri, Configuration config) throws IOException {
       Key key = new Key(uri);
-      if (map.contains(key)) {
-        return map.get(key);
-      }
 
       FileSystem fs = map.computeIfAbsent(key, k -> getNewFileSystem(fsCreator, uri, config));
       if (fs == null) {
