@@ -1065,8 +1065,10 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     int numXceiver = 0;
     for (StorageType s : storageTypes) {
       StorageTypeStats storageTypeStats = storageStats.get(s);
-      numNodes += storageTypeStats.getNodesInService();
-      numXceiver += storageTypeStats.getNodesInServiceXceiverCount();
+      if (storageTypeStats != null) {
+          numNodes += storageTypeStats.getNodesInService();
+          numXceiver += storageTypeStats.getNodesInServiceXceiverCount();
+      }
     }
     if (numNodes != 0) {
       avgLoad = (double) numXceiver / numNodes;
