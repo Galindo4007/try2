@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.hdfs.tools;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.Options;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -146,50 +150,50 @@ public class StoragePolicyAdmin extends Configured implements Tool {
 
     @Override
     public int run(Configuration conf, List<String> args) throws IOException {
-      final String path = StringUtils.popOptionWithArgument("-path", args);
-      if (path == null) {
-        System.err.println("Please specify the path with -path.\nUsage: " +
-            getLongUsage());
-        return 1;
+        final String path = StringUtils.popOptionWithArgument("-path", args);
+        if (path == null) {
+          System.err.println("Please specify the path with -path.\nUsage: " +
+                  getLongUsage());
+          return 1;
       }
 
-      Path p = new Path(path);
-      final FileSystem fs = FileSystem.get(p.toUri(), conf);
-      try {
-        FileStatus status;
+        Path p = new Path(path);
+        final FileSystem fs = FileSystem.get(p.toUri(), conf);
         try {
-          status = fs.getFileStatus(p);
-        } catch (FileNotFoundException e) {
-          System.err.println("File/Directory does not exist: " + path);
-          return 2;
-        }
-
-        if (status instanceof HdfsFileStatus) {
-          byte storagePolicyId = ((HdfsFileStatus)status).getStoragePolicy();
-          if (storagePolicyId ==
-              HdfsConstants.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED) {
-            System.out.println("The storage policy of " + path
-                + " is unspecified");
-            return 0;
+          FileStatus status;
+          try {
+            status = fs.getFileStatus(p);
+          } catch (FileNotFoundException e) {
+            System.err.println("File/Directory does not exist: " + path);
+            return 2;
           }
-          Collection<? extends BlockStoragePolicySpi> policies =
-              fs.getAllStoragePolicies();
-          for (BlockStoragePolicySpi policy : policies) {
-            if (policy instanceof BlockStoragePolicy) {
-              if (((BlockStoragePolicy)policy).getId() == storagePolicyId) {
-                System.out.println("The storage policy of " + path
-                    + ":\n" + policy);
-                return 0;
+
+          if (status instanceof HdfsFileStatus) {
+            byte storagePolicyId = ((HdfsFileStatus)status).getStoragePolicy();
+            if (storagePolicyId ==
+                    HdfsConstants.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED) {
+              System.out.println("The storage policy of " + path
+                      + " is unspecified");
+              return 0;
+            }
+            Collection<? extends BlockStoragePolicySpi> policies =
+                    fs.getAllStoragePolicies();
+            for (BlockStoragePolicySpi policy : policies) {
+              if (policy instanceof BlockStoragePolicy) {
+                if (((BlockStoragePolicy)policy).getId() == storagePolicyId) {
+                  System.out.println("The storage policy of " + path
+                          + ":\n" + policy);
+                  return 0;
+                }
               }
             }
           }
-        }
-        System.err.println(getName() + " is not supported for filesystem "
-            + fs.getScheme() + " on path " + path);
-        return 2;
-      } catch (Exception e) {
-        System.err.println(AdminHelper.prettifyException(e));
-        return 2;
+          System.err.println(getName() + " is not supported for filesystem "
+                  + fs.getScheme() + " on path " + path);
+          return 2;
+        } catch (Exception e) {
+          System.err.println(AdminHelper.prettifyException(e));
+          return 2;
       }
     }
   }
@@ -203,7 +207,7 @@ public class StoragePolicyAdmin extends Configured implements Tool {
 
     @Override
     public String getShortUsage() {
-      return "[" + getName() + " -path <path> -policy <policy>]\n";
+      return "[" + getName() + " [-path <files/dirs> | -file <local file>] -policy <policy>]\n";
     }
 
     @Override
@@ -211,6 +215,8 @@ public class StoragePolicyAdmin extends Configured implements Tool {
       TableListing listing = AdminHelper.getOptionDescriptionListing();
       listing.addRow("<path>", "The path of the file/directory to set storage" +
           " policy");
+      listing.addRow("<file>", "The local file containing a list of HDFS files/dirs to set storage" +
+              " policy");
       listing.addRow("<policy>", "The name of the block storage policy");
       return getShortUsage() + "\n" +
           "Set the storage policy to a file/directory.\n\n" +
@@ -219,31 +225,60 @@ public class StoragePolicyAdmin extends Configured implements Tool {
 
     @Override
     public int run(Configuration conf, List<String> args) throws IOException {
-      final String path = StringUtils.popOptionWithArgument("-path", args);
-      if (path == null) {
+      final Options opts = buildCliOptions();
+      CommandLineParser parser = new GnuParser();
+      CommandLine line = parser.parse(opts, args, true);
+      String[] paths = null;
+      if (line.hasOption("-file")) {
+        paths = readPathFile(StringUtils.popOptionWithArgument("-file", args));
+      } else if (line.hasOption("-path")) {
+        String path = StringUtils.popOptionWithArgument("-path", args);
+        List<String> paths = path != null ? new ArrayList<>(List.of(path)) : new ArrayList<>();
+      }
+      if (paths.length == 0 || paths== null) {
         System.err.println("Please specify the path for setting the storage " +
-            "policy.\nUsage: " + getLongUsage());
+                "policy.\nUsage: " + getLongUsage());
         return 1;
       }
 
       final String policyName = StringUtils.popOptionWithArgument("-policy",
-          args);
+              args);
       if (policyName == null) {
         System.err.println("Please specify the policy name.\nUsage: " +
-            getLongUsage());
+                getLongUsage());
         return 1;
       }
-      Path p = new Path(path);
-      final FileSystem fs = FileSystem.get(p.toUri(), conf);
-      try {
-        fs.setStoragePolicy(p, policyName);
-        System.out.println("Set storage policy " + policyName + " on " + path);
-      } catch (Exception e) {
-        System.err.println(AdminHelper.prettifyException(e));
-        return 2;
+
+      for (String path : paths) {
+        Path p = new Path(path);
+        final FileSystem fs = FileSystem.get(p.toUri(), conf);
+        try {
+          fs.setStoragePolicy(p, policyName);
+          System.out.println("Set storage policy " + policyName + " on " + path);
+        } catch (Exception e) {
+          System.err.println(AdminHelper.prettifyException(e));
+          return 2;
+        }
       }
       return 0;
     }
+  }
+
+  private static String[] readPathFile(String file) throws IOException {
+    List<String> list = Lists.newArrayList();
+    BufferedReader reader = new BufferedReader(
+            new InputStreamReader(new FileInputStream(file), "UTF-8"));
+    try {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (!line.trim().isEmpty()) {
+          list.add(line);
+        }
+      }
+    } finally {
+      IOUtils.cleanupWithLogger(LOG, reader);
+    }
+    return list.toArray(new String[list.size()]);
   }
 
   /** Command to schedule blocks to move based on specified policy. */
