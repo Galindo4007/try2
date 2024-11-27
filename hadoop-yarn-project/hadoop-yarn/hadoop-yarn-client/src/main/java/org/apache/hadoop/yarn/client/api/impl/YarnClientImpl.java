@@ -451,8 +451,11 @@ public class YarnClientImpl extends YarnClient {
       }
     }
     org.apache.hadoop.security.token.Token<TimelineDelegationTokenIdentifier>
-        timelineDelegationToken = getTimelineDelegationToken();
-    if (timelineDelegationToken == null) {
+            timelineDelegationToken = null;
+    try{
+      timelineDelegationToken = getTimelineDelegationToken();
+    }catch (Exception e){
+      LOG.error("Failed to get delegation token: {}", e.getMessage());
       return;
     }
     credentials.addToken(timelineService, timelineDelegationToken);
