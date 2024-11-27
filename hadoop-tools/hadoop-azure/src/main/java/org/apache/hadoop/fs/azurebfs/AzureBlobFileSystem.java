@@ -668,6 +668,24 @@ public class AzureBlobFileSystem extends FileSystem
     }
   }
 
+  public FileStatus[] listStatus(final Path f, final String startFrom) throws IOException {
+    LOG.debug(
+        "AzureBlobFileSystem.listStatus path: {}, startFrom: {}", f.toString(), startFrom);
+    statIncrement(CALL_LIST_STATUS);
+    Path qualifiedPath = makeQualified(f);
+
+    try {
+      TracingContext tracingContext = new TracingContext(clientCorrelationId,
+          fileSystemId, FSOperationType.LISTSTATUS, true, tracingHeaderFormat,
+          listener);
+      FileStatus[] result = abfsStore.listStatus(qualifiedPath, startFrom, tracingContext);
+      return result;
+    } catch (AzureBlobFileSystemException ex) {
+      checkException(f, ex);
+      return null;
+    }
+  }
+
   /**
    * Increment of an Abfs statistic.
    *
