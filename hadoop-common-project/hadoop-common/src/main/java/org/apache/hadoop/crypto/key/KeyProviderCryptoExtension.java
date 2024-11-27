@@ -292,15 +292,20 @@ public class KeyProviderCryptoExtension extends
       // Generate random bytes for new key and IV
 
       CryptoCodec cc = CryptoCodec.getInstance(keyProvider.getConf());
-      try {
-        final byte[] newKey = new byte[encryptionKey.getMaterial().length];
-        cc.generateSecureRandom(newKey);
-        final byte[] iv = new byte[cc.getCipherSuite().getAlgorithmBlockSize()];
-        cc.generateSecureRandom(iv);
-        Encryptor encryptor = cc.createEncryptor();
-        return generateEncryptedKey(encryptor, encryptionKey, newKey, iv);
-      } finally {
-        cc.close();
+
+      if (cc != null){
+        try {
+          final byte[] newKey = new byte[encryptionKey.getMaterial().length];
+          cc.generateSecureRandom(newKey);
+          final byte[] iv = new byte[cc.getCipherSuite().getAlgorithmBlockSize()];
+          cc.generateSecureRandom(iv);
+          Encryptor encryptor = cc.createEncryptor();
+          return generateEncryptedKey(encryptor, encryptionKey, newKey, iv);
+        } finally {
+          cc.close();
+        }
+      } else {
+        throw new IOException("CyrptoCode object is null");
       }
     }
 
