@@ -6303,6 +6303,24 @@
   </property>
 
   <property>
+    <name>dfs.namenode.block.deletion.async</name>
+    <value>true</value>
+    <description>
+      If false, disable block deleting asynchronously
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.namenode.block.deletion.increment</name>
+    <value>1000</value>
+    <description>
+      The number of block deletion increment.
+      This setting will control the block increment deletion rate to
+      ensure that other waiters on the lock can get in.
+    </description>
+  </property>
+
+  <property>
     <name>dfs.namenode.rpc-address.auxiliary-ports</name>
     <value></value>
     <description>
