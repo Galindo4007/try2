@@ -427,11 +427,9 @@ public abstract class ContainerExecutor implements Configurable {
       // in a docker image).  Put these before the others to ensure the
       // correct expansion is used.
       for(String var : whitelistVars) {
-        if (!environment.containsKey(var)) {
-          String val = getNMEnvVar(var);
-          if (val != null) {
-            sb.whitelistedEnv(var, val);
-          }
+        String val = getNMEnvVar(var);
+        if (val != null) {
+          sb.whitelistedEnv(var, val);
         }
       }
       // Now write vars that were set explicitly by nodemanager, preserving
