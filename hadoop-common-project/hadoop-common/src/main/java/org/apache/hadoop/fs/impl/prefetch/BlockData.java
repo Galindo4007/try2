@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.fs.impl.prefetch;
 
+import java.util.Arrays;
+
 import static org.apache.hadoop.fs.impl.prefetch.Validate.checkNotNegative;
 import static org.apache.hadoop.fs.impl.prefetch.Validate.checkPositiveInteger;
 import static org.apache.hadoop.fs.impl.prefetch.Validate.checkWithinRange;
@@ -89,6 +91,23 @@ public final class BlockData {
                 ? 1
                 : 0);
     this.state = new State[this.numBlocks];
+    markBlocksAsNotReady();
+  }
+
+  @Override
+  public String toString() {
+    return "BlockData{" +
+        "state=" + Arrays.toString(state) +
+        ", fileSize=" + fileSize +
+        ", blockSize=" + blockSize +
+        ", numBlocks=" + numBlocks +
+        '}';
+  }
+
+  /**
+   * Mark all the blocks as not ready.
+   */
+  public void markBlocksAsNotReady() {
     for (int b = 0; b < this.numBlocks; b++) {
       setState(b, State.NOT_READY);
     }

@@ -72,12 +72,12 @@ public class S3ACachingBlockManager extends CachingBlockManager {
   @Override
   public int read(ByteBuffer buffer, long startOffset, int size)
       throws IOException {
-    return this.reader.read(buffer, startOffset, size);
+    return reader.read(buffer, startOffset, size);
   }
 
   @Override
   public synchronized void close() {
-    this.reader.close();
+    reader.close();
 
     super.close();
   }

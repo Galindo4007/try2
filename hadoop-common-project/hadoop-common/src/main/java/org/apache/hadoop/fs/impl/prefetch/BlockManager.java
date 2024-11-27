@@ -23,6 +23,9 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static org.apache.hadoop.fs.impl.prefetch.Validate.checkNotNegative;
 import static org.apache.hadoop.fs.impl.prefetch.Validate.checkNotNull;
 
@@ -33,6 +36,9 @@ import static org.apache.hadoop.fs.impl.prefetch.Validate.checkNotNull;
  * perform prefetching or caching.
  */
 public abstract class BlockManager implements Closeable {
+
+  private static final Logger LOG = LoggerFactory.getLogger(
+      BlockManager.class);
 
   /**
    * Information about each block of the underlying file.
@@ -80,6 +86,7 @@ public abstract class BlockManager implements Closeable {
     int size = blockData.getSize(blockNumber);
     ByteBuffer buffer = ByteBuffer.allocate(size);
     long startOffset = blockData.getStartOffset(blockNumber);
+    LOG.debug("Get block {} range [{} - {}]", blockNumber, startOffset, startOffset + size - 1);
     read(buffer, startOffset, size);
     buffer.flip();
     return new BufferData(blockNumber, buffer);
@@ -125,8 +132,9 @@ public abstract class BlockManager implements Closeable {
 
   /**
    * Requests cancellation of any previously issued prefetch requests.
+   * @param reason why?
    */
-  public void cancelPrefetches() {
+  public void cancelPrefetches(final CancelReason reason) {
     // Do nothing because we do not support prefetches.
   }
 
@@ -141,5 +149,17 @@ public abstract class BlockManager implements Closeable {
 
   @Override
   public void close() {
+  }
+
+  /**
+   * Reason for cancelling prefetches.
+   */
+  public enum CancelReason {
+    /** Stream has switched to random IO. */
+    RandomIO,
+    /** Stream closed completely. */
+    Close,
+    /** Stream unbuffered. */
+    Unbuffer
   }
 }

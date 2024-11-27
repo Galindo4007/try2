@@ -19,9 +19,12 @@
 
 package org.apache.hadoop.fs.impl.prefetch;
 
+import java.time.Duration;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 
 /**
@@ -29,6 +32,11 @@ import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
  */
 @InterfaceAudience.Private
 public final class BlockManagerParameters {
+
+  /**
+   * The path of the underlying file; for logging.
+   */
+  private Path path;
 
   /**
    * Asynchronous tasks are performed in this pool.
@@ -70,6 +78,10 @@ public final class BlockManagerParameters {
    */
   private DurationTrackerFactory trackerFactory;
 
+
+  private Duration maxRetry;
+
+private         Duration updateInterval;
   /**
    * @return The Executor future pool to perform async prefetch tasks.
    */
@@ -224,4 +236,48 @@ public final class BlockManagerParameters {
     return this;
   }
 
+  /**
+   * @return The path of the underlying file.
+   */
+  public Path getPath() {
+    return path;
+  }
+
+  /**
+   * Set the path.
+   * @param value new value
+   * @return the builder
+   */
+  public BlockManagerParameters withPath(final Path value) {
+    path = value;
+    return this;
+  }
+
+  /**
+   * Set builder value.
+   * @param value new value
+   * @return the builder
+   */
+  public BlockManagerParameters withMaxRetry(final Duration value) {
+    maxRetry = value;
+    return this;
+  }
+
+  public Duration getMaxRetry() {
+    return maxRetry;
+  }
+
+  /**
+   * Set builder value.
+   * @param value new value
+   * @return the builder
+   */
+  public BlockManagerParameters withUpdateInterval(final Duration value) {
+    updateInterval = value;
+    return this;
+  }
+
+  public Duration getUpdateInterval() {
+    return updateInterval;
+  }
 }

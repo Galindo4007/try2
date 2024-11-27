@@ -357,6 +357,11 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
   /** Log to warn of storage class configuration problems. */
   private static final LogExactlyOnce STORAGE_CLASS_WARNING = new LogExactlyOnce(LOG);
 
+  /**
+   * Directory allocator, bonded to directory list set in
+   * {@link Constants#BUFFER_DIR} and used for storing temporary files
+   * including: upload file blocks, stage committer files and cached read blocks.
+   */
   private LocalDirAllocator directoryAllocator;
   private String cannedACL;
 
@@ -2063,7 +2068,7 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
         prefetchBlockCount)
         .withAuditSpan(auditSpan);
     openFileHelper.applyDefaultOptions(roc);
-    return roc.build();
+    return roc;
   }
 
   /**
@@ -2624,8 +2629,8 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
 
     @Override
     public S3AReadOpContext createReadContext(final FileStatus fileStatus) {
-      return S3AFileSystem.this.createReadContext(fileStatus,
-          auditSpan);
+      return S3AFileSystem.this.createReadContext(fileStatus, auditSpan)
+          .build();
     }
 
     @Override
@@ -5549,7 +5554,11 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
     case CommonPathCapabilities.VIRTUAL_BLOCK_LOCATIONS:
       return true;
 
-       /*
+    // Is prefetching enabled?
+    case PREFETCH_ENABLED_KEY:
+      return prefetchEnabled;
+
+    /*
      * Marker policy capabilities are handed off.
      */
     case STORE_CAPABILITY_DIRECTORY_MARKER_POLICY_KEEP:
