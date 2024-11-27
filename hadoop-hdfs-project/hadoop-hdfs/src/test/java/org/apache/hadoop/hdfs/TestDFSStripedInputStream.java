@@ -555,16 +555,16 @@ public class TestDFSStripedInputStream {
       final ElasticByteBufferPool ebbp =
           (ElasticByteBufferPool) stream.getBufferPool();
       // first clear existing pool
-      LOG.info("Current pool size: direct: " + ebbp.size(true) + ", indirect: "
-          + ebbp.size(false));
+      LOG.info("Current pool size: direct: " + ebbp.getCurrentBuffersCount(true) + ", indirect: "
+          + ebbp.getCurrentBuffersCount(false));
       emptyBufferPoolForCurrentPolicy(ebbp, true);
       emptyBufferPoolForCurrentPolicy(ebbp, false);
-      final int startSizeDirect = ebbp.size(true);
-      final int startSizeIndirect = ebbp.size(false);
+      final int startSizeDirect = ebbp.getCurrentBuffersCount(true);
+      final int startSizeIndirect = ebbp.getCurrentBuffersCount(false);
       // close should not allocate new buffers in the pool.
       stream.close();
-      assertEquals(startSizeDirect, ebbp.size(true));
-      assertEquals(startSizeIndirect, ebbp.size(false));
+      assertEquals(startSizeDirect, ebbp.getCurrentBuffersCount(true));
+      assertEquals(startSizeIndirect, ebbp.getCurrentBuffersCount(false));
     }
   }
 
@@ -621,10 +621,10 @@ public class TestDFSStripedInputStream {
   private void emptyBufferPoolForCurrentPolicy(ElasticByteBufferPool ebbp,
       boolean direct) {
     int size;
-    while ((size = ebbp.size(direct)) != 0) {
+    while ((size = ebbp.getCurrentBuffersCount(direct)) != 0) {
       ebbp.getBuffer(direct,
           ecPolicy.getCellSize() * ecPolicy.getNumDataUnits());
-      if (size == ebbp.size(direct)) {
+      if (size == ebbp.getCurrentBuffersCount(direct)) {
         // if getBuffer didn't decrease size, it means the pool for the buffer
         // corresponding to current ecPolicy is empty
         break;

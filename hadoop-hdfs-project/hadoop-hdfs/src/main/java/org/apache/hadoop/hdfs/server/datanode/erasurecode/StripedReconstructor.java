@@ -30,7 +30,7 @@ import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.util.StripedBlockUtil;
 import org.apache.hadoop.hdfs.util.StripedBlockUtil.BlockReadStats;
 import org.apache.hadoop.io.ByteBufferPool;
-import org.apache.hadoop.io.ElasticByteBufferPool;
+import org.apache.hadoop.io.WeakReferencedElasticByteBufferPool;
 import org.apache.hadoop.io.erasurecode.CodecUtil;
 import org.apache.hadoop.io.erasurecode.ErasureCoderOptions;
 import org.apache.hadoop.io.erasurecode.rawcoder.RawErasureDecoder;
@@ -108,7 +108,7 @@ abstract class StripedReconstructor {
   private final ErasureCoderOptions coderOptions;
   private RawErasureDecoder decoder;
   private final ExtendedBlock blockGroup;
-  private static final ByteBufferPool BUFFER_POOL = new ElasticByteBufferPool();
+  private static final ByteBufferPool BUFFER_POOL = new WeakReferencedElasticByteBufferPool();
 
   private final boolean isValidationEnabled;
   private DecodingValidator validator;

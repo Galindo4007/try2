@@ -53,7 +53,7 @@ public class TestWeakReferencedElasticByteBufferPool
 
   @Test
   public void testGetAndPutBasic() {
-    WeakReferencedElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
+    ElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
     int bufferSize = 5;
     ByteBuffer buffer = pool.getBuffer(isDirect, bufferSize);
     Assertions.assertThat(buffer.isDirect())
@@ -83,7 +83,7 @@ public class TestWeakReferencedElasticByteBufferPool
 
   @Test
   public void testPoolingWithDifferentSizes() {
-    WeakReferencedElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
+    ElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
     ByteBuffer buffer = pool.getBuffer(isDirect, 5);
     ByteBuffer buffer1 = pool.getBuffer(isDirect, 10);
     ByteBuffer buffer2 = pool.getBuffer(isDirect, 15);
@@ -121,7 +121,7 @@ public class TestWeakReferencedElasticByteBufferPool
 
   @Test
   public void testPoolingWithDifferentInsertionTime() {
-    WeakReferencedElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
+    ElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
     ByteBuffer buffer = pool.getBuffer(isDirect, 10);
     ByteBuffer buffer1 = pool.getBuffer(isDirect, 10);
     ByteBuffer buffer2 = pool.getBuffer(isDirect, 10);
@@ -155,7 +155,7 @@ public class TestWeakReferencedElasticByteBufferPool
 
   @Test
   public void testGarbageCollection() {
-    WeakReferencedElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
+    ElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
     ByteBuffer buffer = pool.getBuffer(isDirect, 5);
     ByteBuffer buffer1 = pool.getBuffer(isDirect, 10);
     ByteBuffer buffer2 = pool.getBuffer(isDirect, 15);
@@ -187,7 +187,7 @@ public class TestWeakReferencedElasticByteBufferPool
 
   @Test
   public void testWeakReferencesPruning() {
-    WeakReferencedElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
+    ElasticByteBufferPool pool = new WeakReferencedElasticByteBufferPool();
     ByteBuffer buffer1 = pool.getBuffer(isDirect, 5);
     ByteBuffer buffer2 = pool.getBuffer(isDirect, 10);
     ByteBuffer buffer3 = pool.getBuffer(isDirect, 15);

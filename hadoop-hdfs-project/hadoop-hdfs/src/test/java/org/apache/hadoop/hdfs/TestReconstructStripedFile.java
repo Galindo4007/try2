@@ -828,7 +828,7 @@ public class TestReconstructStripedFile {
 
   private void assertBufferPoolIsEmpty(ElasticByteBufferPool bufferPool,
       boolean direct) {
-    while (bufferPool.size(direct) != 0) {
+    while (bufferPool.getCurrentBuffersCount(direct) != 0) {
       // iterate all ByteBuffers in ElasticByteBufferPool
       ByteBuffer byteBuffer =  bufferPool.getBuffer(direct, 0);
       Assert.assertEquals(0, byteBuffer.position());
@@ -837,7 +837,7 @@ public class TestReconstructStripedFile {
 
   private void emptyBufferPool(ElasticByteBufferPool bufferPool,
       boolean direct) {
-    while (bufferPool.size(direct) != 0) {
+    while (bufferPool.getCurrentBuffersCount(direct) != 0) {
       bufferPool.getBuffer(direct, 0);
     }
   }
