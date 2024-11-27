@@ -703,6 +703,14 @@ message GetQuotaUsageResponseProto {
   required QuotaUsageProto usage = 1;
 }
 
+message GetQuotaListingRequestProto {
+  required string quotaRoot = 1;
+}
+
+message GetQuotaListingResponseProto {
+  optional QuotaListingProto quotaListing = 1;
+}
+
 message SetQuotaRequestProto {
   required string path = 1;
   required uint64 namespaceQuota = 2;
@@ -1080,6 +1088,8 @@ service ClientNamenodeProtocol {
       returns(GetErasureCodingCodecsResponseProto);
   rpc getQuotaUsage(GetQuotaUsageRequestProto)
       returns(GetQuotaUsageResponseProto);
+  rpc getQuotaListing(GetQuotaListingRequestProto)
+      returns(GetQuotaListingResponseProto);
   rpc listOpenFiles(ListOpenFilesRequestProto)
       returns(ListOpenFilesResponseProto);
   rpc msync(MsyncRequestProto)
