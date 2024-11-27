@@ -2185,6 +2185,7 @@ public class BlockManager implements BlockStatsMXBean {
       for (BlockReconstructionWork rw : reconWork) {
         final DatanodeStorageInfo[] targets = rw.getTargets();
         if (targets == null || targets.length == 0) {
+          LOG.debug("Block {} cannot find available target host", rw.getBlock());
           rw.resetTargets();
           continue;
         }
@@ -2192,6 +2193,8 @@ public class BlockManager implements BlockStatsMXBean {
         synchronized (neededReconstruction) {
           if (validateReconstructionWork(rw)) {
             scheduledWork++;
+          } else {
+            LOG.debug("Block {} validation for reconstruction work failed", rw.getBlock());
           }
         }
       }
@@ -2600,6 +2603,7 @@ public class BlockManager implements BlockStatsMXBean {
       // do not select the replica if it is corrupt or excess
       if (state == StoredReplicaState.CORRUPT ||
           state == StoredReplicaState.EXCESS) {
+        LOG.debug("Block {} on storage {} cannot be chosen, state: {}", block, storage, state);
         continue;
       }
 
@@ -2607,6 +2611,7 @@ public class BlockManager implements BlockStatsMXBean {
       // or unknown state replicas.
       if (state == null
           || state == StoredReplicaState.MAINTENANCE_NOT_FOR_READ) {
+        LOG.debug("Block {} on storage {} cannot be chosen, state: {}", block, storage, state);
         continue;
       }
 
@@ -2618,6 +2623,7 @@ public class BlockManager implements BlockStatsMXBean {
             ThreadLocalRandom.current().nextBoolean()) {
           decommissionedSrc = node;
         }
+        LOG.debug("Block {} on storage {} cannot be chosen, state: {}, decommissionedSrc: {}", block, storage, state, decommissionedSrc);
         continue;
       }
 
@@ -2642,6 +2648,9 @@ public class BlockManager implements BlockStatsMXBean {
           //HDFS-16566 ExcludeReconstructed won't be reconstructed.
           excludeReconstructed.add(blockIndex);
         }
+        if (node.getNumberOfBlocksToBeReplicated() >= maxReplicationStreams) {
+          LOG.warn("already reached replication limit, current: {}, maxReplicationStreams: {}", node.getNumberOfBlocksToBeReplicated(), maxReplicationStreams);
+        }
         continue; // already reached replication limit
       }
 
@@ -2653,6 +2662,7 @@ public class BlockManager implements BlockStatsMXBean {
           //HDFS-16566 ExcludeReconstructed won't be reconstructed.
           excludeReconstructed.add(blockIndex);
         }
+        LOG.warn("already reached replication hard limit, current: {}, replicationStreamsHardLimit: {}", node.getNumberOfBlocksToBeReplicated(), replicationStreamsHardLimit);
         continue;
       }
 
