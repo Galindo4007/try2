@@ -1760,4 +1760,22 @@ public final class Constants {
    * Value: {@value}.
    */
   public static final String S3A_IO_RATE_LIMIT = "fs.s3a.io.rate.limit";
+
+  /**
+   * Config to enable Analytics Accelerator Library for Amazon S3
+   * https://github.com/awslabs/analytics-accelerator-s3
+   */
+  public static final String ANALYTICS_ACCELERATOR_ENABLED_KEY = "fs.s3a.analytics.accelerator.enabled";
+
+  /**
+   * Default value for {@link #ANALYTICS_ACCELERATOR_ENABLED_KEY }
+   * Value {@value}.
+   */
+  public static final boolean ANALYTICS_ACCELERATOR_ENABLED_DEFAULT = false;
+
+  /**
+   * Prefix to configure Analytics Accelerator Library
+   */
+  public static final String ANALYTICS_ACCELERATOR_CONFIGURATION_PREFIX = "fs.s3a.analytics.accelerator";
+
 }

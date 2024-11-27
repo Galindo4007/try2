@@ -54,7 +54,9 @@ import javax.annotation.Nullable;
 
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.exception.SdkException;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.internal.crt.S3CrtAsyncClient;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.GetBucketLocationRequest;
@@ -86,6 +88,11 @@ import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 import software.amazon.awssdk.transfer.s3.model.CompletedCopy;
 import software.amazon.awssdk.transfer.s3.model.Copy;
 import software.amazon.awssdk.transfer.s3.model.CopyRequest;
+
+import software.amazon.s3.analyticsaccelerator.S3SdkObjectClient;
+import software.amazon.s3.analyticsaccelerator.S3SeekableInputStreamConfiguration;
+import software.amazon.s3.analyticsaccelerator.S3SeekableInputStreamFactory;
+import software.amazon.s3.analyticsaccelerator.common.ConnectorConfiguration;
 
 import org.apache.hadoop.fs.impl.prefetch.ExecutorServiceFuturePool;
 import org.slf4j.Logger;
@@ -317,6 +324,13 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
    */
   private S3Client s3Client;
 
+  /**
+   * CRT-Based S3Client created of analytics accelerator library is enabled
+   * and managed by the ClientManager. Analytics accelerator library can be
+   * enabled with {@link Constants#ANALYTICS_ACCELERATOR_ENABLED_KEY}
+   */
+  private S3AsyncClient crtClient;
+
   // initial callback policy is fail-once; it's there just to assist
   // some mock tests and other codepaths trying to call the low level
   // APIs on an uninitialized filesystem.
@@ -343,6 +357,9 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
 
   // If true, the prefetching input stream is used for reads.
   private boolean prefetchEnabled;
+
+  // If true, S3SeekableInputStream from Analytics Accelerator for Amazon S3 will be used.
+  private boolean analyticsAcceleratorEnabled;
 
   // Size in bytes of a single prefetch block.
   private int prefetchBlockSize;
@@ -525,6 +542,11 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
    */
   private boolean s3AccessGrantsEnabled;
 
+  /**
+   * Factory to create S3SeekableInputStream if {@link this#analyticsAcceleratorEnabled} is true
+   */
+  private S3SeekableInputStreamFactory s3SeekableInputStreamFactory;
+
   /** Add any deprecated keys. */
   @SuppressWarnings("deprecation")
   private static void addDeprecatedKeys() {
@@ -672,6 +694,7 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
           s3ExpressStore);
 
       this.prefetchEnabled = conf.getBoolean(PREFETCH_ENABLED_KEY, PREFETCH_ENABLED_DEFAULT);
+      this.analyticsAcceleratorEnabled = conf.getBoolean(ANALYTICS_ACCELERATOR_ENABLED_KEY, ANALYTICS_ACCELERATOR_ENABLED_DEFAULT);
       long prefetchBlockSizeLong =
           longBytesOption(conf, PREFETCH_BLOCK_SIZE_KEY, PREFETCH_BLOCK_DEFAULT_SIZE, 1);
       if (prefetchBlockSizeLong > (long) Integer.MAX_VALUE) {
@@ -717,6 +740,17 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
       // this may do some patching of the configuration (e.g. setting
       // the encryption algorithms)
       ClientManager clientManager = createClientManager(name, delegationTokensEnabled);
+
+      if (this.analyticsAcceleratorEnabled) {
+        LOG.info("Using S3SeekableInputStream");
+        this.crtClient = S3CrtAsyncClient.builder().maxConcurrency(600).build();
+        ConnectorConfiguration configuration = new ConnectorConfiguration(conf, ANALYTICS_ACCELERATOR_CONFIGURATION_PREFIX);
+        S3SeekableInputStreamConfiguration seekableInputStreamConfiguration =
+                S3SeekableInputStreamConfiguration.fromConfiguration(configuration);
+        this.s3SeekableInputStreamFactory =
+                new S3SeekableInputStreamFactory(
+                        new S3SdkObjectClient(this.crtClient), seekableInputStreamConfiguration);
+      }
 
       inputPolicy = S3AInputPolicy.getPolicy(
           conf.getTrimmed(INPUT_FADVISE,
@@ -1876,6 +1910,8 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
       final Path path,
       final OpenFileSupport.OpenFileInformation fileInformation)
       throws IOException {
+
+
     // create the input stream statistics before opening
     // the file so that the time to prepare to open the file is included.
     S3AInputStreamStatistics inputStreamStats =
@@ -1891,6 +1927,14 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
         auditSpan);
     fileInformation.applyOptions(readContext);
     LOG.debug("Opening '{}'", readContext);
+
+    if (this.analyticsAcceleratorEnabled) {
+      return new FSDataInputStream(
+              new S3ASeekableStream(
+                      this.bucket,
+                      pathToKey(path),
+                      s3SeekableInputStreamFactory));
+    }
 
     if (this.prefetchEnabled) {
       Configuration configuration = getConf();
@@ -4421,9 +4465,11 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
   protected synchronized void stopAllServices() {
     try {
       trackDuration(getDurationTrackerFactory(), FILESYSTEM_CLOSE.getSymbol(), () -> {
-        closeAutocloseables(LOG, store);
+        closeAutocloseables(LOG, store, s3SeekableInputStreamFactory);
         store = null;
         s3Client = null;
+        crtClient = null;
+        s3SeekableInputStreamFactory = null;
 
         // At this point the S3A client is shut down,
         // now the executor pools are closed
