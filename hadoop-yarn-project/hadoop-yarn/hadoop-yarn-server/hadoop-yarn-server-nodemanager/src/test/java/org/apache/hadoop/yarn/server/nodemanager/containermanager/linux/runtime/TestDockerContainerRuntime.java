@@ -1381,7 +1381,7 @@ public class TestDockerContainerRuntime {
 
     env.put(
         DockerLinuxContainerRuntime.ENV_DOCKER_CONTAINER_MOUNTS,
-        "test_dir/test_resource_file:test_mount1:ro," +
+        "test_dir/test_resource_file:test_mount1:ro;" +
             "test_dir/test_resource_file:test_mount2:ro");
 
     runtime.launchContainer(builder.build());
@@ -1431,8 +1431,8 @@ public class TestDockerContainerRuntime {
 
     env.put(
         DockerLinuxContainerRuntime.ENV_DOCKER_CONTAINER_MOUNTS,
-        "/tmp/foo:/tmp/foo:ro,/tmp/bar:/tmp/bar:rw,/tmp/baz:/tmp/baz," +
-            "/a:/a:shared,/b:/b:ro+shared,/c:/c:rw+rshared,/d:/d:private");
+        "/tmp/foo:/tmp/foo:ro;/tmp/bar:/tmp/bar:rw;/tmp/baz:/tmp/baz;" +
+            "/a:/a:shared;/b:/b:ro+shared;/c:/c:rw+rshared;/d:/d:private");
 
     runtime.launchContainer(builder.build());
     List<String> dockerCommands = readDockerCommands();
@@ -1480,7 +1480,7 @@ public class TestDockerContainerRuntime {
 
     env.put(
         DockerLinuxContainerRuntime.ENV_DOCKER_CONTAINER_MOUNTS,
-        "/source:target:ro,/source:target:other,/source:target:rw");
+        "/source:target:ro;/source:target:other;/source:target:rw");
 
     try {
       runtime.launchContainer(builder.build());
