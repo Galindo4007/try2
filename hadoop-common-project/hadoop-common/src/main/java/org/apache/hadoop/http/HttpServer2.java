@@ -197,7 +197,7 @@ public final class HttpServer2 implements FilterContainer {
   static final String STATE_DESCRIPTION_ALIVE = " - alive";
   static final String STATE_DESCRIPTION_NOT_LIVE = " - not live";
   private final SignerSecretProvider secretProvider;
-  private final Optional<java.util.Timer> configurationChangeMonitor;
+  private Optional<java.util.Timer> configurationChangeMonitor = Optional.empty();
   private XFrameOption xFrameOption;
   private boolean xFrameOptionIsEnabled;
   public static final String HTTP_HEADER_PREFIX = "hadoop.http.header.";
@@ -257,8 +257,6 @@ public final class HttpServer2 implements FilterContainer {
     private XFrameOption xFrameOption = XFrameOption.SAMEORIGIN;
 
     private boolean sniHostCheckEnabled;
-
-    private Optional<Timer> configurationChangeMonitor = Optional.empty();
 
     public Builder setName(String name){
       this.name = name;
@@ -547,7 +545,7 @@ public final class HttpServer2 implements FilterContainer {
           connector = createHttpChannelConnector(server.webServer,
               httpConfig);
         } else if (HTTPS_SCHEME.equals(scheme)) {
-          connector = createHttpsChannelConnector(server.webServer,
+          connector = createHttpsChannelConnector(server,
               httpConfig);
         } else {
           throw new HadoopIllegalArgumentException(
@@ -581,11 +579,11 @@ public final class HttpServer2 implements FilterContainer {
     }
 
     private ServerConnector createHttpsChannelConnector(
-        Server server, HttpConfiguration httpConfig) {
+        HttpServer2 server, HttpConfiguration httpConfig) {
       httpConfig.setSecureScheme(HTTPS_SCHEME);
       httpConfig.addCustomizer(
           new SecureRequestCustomizer(sniHostCheckEnabled));
-      ServerConnector conn = createHttpChannelConnector(server, httpConfig);
+      ServerConnector conn = createHttpChannelConnector(server.webServer, httpConfig);
 
       SslContextFactory.Server sslContextFactory =
           new SslContextFactory.Server();
@@ -621,7 +619,7 @@ public final class HttpServer2 implements FilterContainer {
 
       if (storesReloadInterval > 0 &&
           (keyStore != null || trustStore != null)) {
-        this.configurationChangeMonitor = Optional.of(
+        server.configurationChangeMonitor = Optional.of(
             this.makeConfigurationChangeMonitor(storesReloadInterval, sslContextFactory));
       }
 
@@ -704,7 +702,6 @@ public final class HttpServer2 implements FilterContainer {
     this.webAppContext = createWebAppContext(b, adminsAcl, appDir);
     this.xFrameOptionIsEnabled = b.xFrameEnabled;
     this.xFrameOption = b.xFrameOption;
-    this.configurationChangeMonitor = b.configurationChangeMonitor;
 
     try {
       this.secretProvider =
