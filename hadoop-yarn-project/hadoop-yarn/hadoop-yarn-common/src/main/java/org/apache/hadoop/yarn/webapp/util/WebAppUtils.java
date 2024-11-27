@@ -47,6 +47,8 @@ import org.apache.hadoop.yarn.webapp.BadRequestException;
 import org.apache.hadoop.yarn.webapp.NotFoundException;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -61,6 +63,7 @@ public class WebAppUtils {
       "ssl.server.keystore.keypassword";
   public static final String HTTPS_PREFIX = "https://";
   public static final String HTTP_PREFIX = "http://";
+  public static final Logger LOG = LoggerFactory.getLogger(WebAppUtils.class);
 
   public static void setRMWebAppPort(Configuration conf, int port) {
     String hostname = getRMWebAppURLWithoutScheme(conf);
@@ -509,11 +512,18 @@ public class WebAppUtils {
       char[] passchars = conf.getPassword(alias);
       if (passchars != null) {
         password = new String(passchars);
+        LOG.info("Successful password retrieval for alias: {}", alias);
       }
     }
     catch (IOException ioe) {
       password = null;
+      LOG.error("Unable to retrieve password for alias: {}", alias, ioe);
     }
+
+    if (password == null) {
+      LOG.error("Password does not exist for alias: {}", alias);
+    }
+
     return password;
   }
 
