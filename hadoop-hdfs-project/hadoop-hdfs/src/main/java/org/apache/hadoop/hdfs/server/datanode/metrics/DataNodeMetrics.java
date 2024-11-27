@@ -351,6 +351,10 @@ public class DataNodeMetrics {
     blocksReplicated.incr();
   }
 
+  public long getBlocksReplicated() {
+    return blocksReplicated.value();
+  }
+
   public void incrBlocksWritten() {
     blocksWritten.incr();
   }
@@ -582,6 +586,10 @@ public class DataNodeMetrics {
 
   public void incrECReconstructionTasks() {
     ecReconstructionTasks.incr();
+  }
+
+  public long getECReconstructionTasks() {
+    return ecReconstructionTasks.value();
   }
 
   public void incrECFailedReconstructionTasks() {

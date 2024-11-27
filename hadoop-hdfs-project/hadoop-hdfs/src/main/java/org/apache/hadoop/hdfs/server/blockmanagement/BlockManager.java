@@ -500,6 +500,7 @@ public class BlockManager implements BlockStatsMXBean {
    * Limits number of blocks used to check for excess redundancy timeout.
    */
   private long excessRedundancyTimeoutCheckLimit;
+  private boolean decommissionECReconstruction = false;
 
   public BlockManager(final Namesystem namesystem, boolean haEnabled,
       final Configuration conf) throws IOException {
@@ -613,7 +614,9 @@ public class BlockManager implements BlockStatsMXBean {
     setExcessRedundancyTimeoutCheckLimit(conf.getLong(
         DFS_NAMENODE_EXCESS_REDUNDANCY_TIMEOUT_CHECK_LIMIT,
         DFS_NAMENODE_EXCESS_REDUNDANCY_TIMEOUT_CHECK_LIMIT_DEFAULT));
-
+    this.decommissionECReconstruction =
+        conf.getBoolean(DFS_NAMENODE_DECOMMISSION_EC_RECONSTRUCTION_ENABLE,
+            DFS_NAMENODE_DECOMMISSION_EC_RECONSTRUCTION_ENABLE_DEFAULT);
     printInitialConfigs();
   }
 
@@ -2244,11 +2247,11 @@ public class BlockManager implements BlockStatsMXBean {
     List<DatanodeStorageInfo> liveReplicaNodes = new ArrayList<>();
     NumberReplicas numReplicas = new NumberReplicas();
     List<Byte> liveBlockIndices = new ArrayList<>();
+    List<Byte> liveAndDecommissioningBusyBlockIndices = new ArrayList<>();
     List<Byte> liveBusyBlockIndices = new ArrayList<>();
-    List<Byte> excludeReconstructed = new ArrayList<>();
     final DatanodeDescriptor[] srcNodes = chooseSourceDatanodes(block,
         containingNodes, liveReplicaNodes, numReplicas,
-        liveBlockIndices, liveBusyBlockIndices, excludeReconstructed, priority);
+        liveBlockIndices, liveAndDecommissioningBusyBlockIndices, liveBusyBlockIndices, priority);
     short requiredRedundancy = getExpectedLiveRedundancyNum(block,
         numReplicas);
     if (srcNodes == null || srcNodes.length == 0) {
@@ -2312,17 +2315,19 @@ public class BlockManager implements BlockStatsMXBean {
       byte[] newIndices = new byte[liveBlockIndices.size()];
       adjustSrcNodesAndIndices((BlockInfoStriped)block,
           srcNodes, liveBlockIndices, newSrcNodes, newIndices);
-      byte[] busyIndices = new byte[liveBusyBlockIndices.size()];
-      for (int i = 0; i < liveBusyBlockIndices.size(); i++) {
-        busyIndices[i] = liveBusyBlockIndices.get(i);
+      byte[] liveAndDecommissioningBusyIndices =
+          new byte[liveAndDecommissioningBusyBlockIndices.size()];
+      for (int i = 0; i < liveAndDecommissioningBusyBlockIndices.size(); i++) {
+        liveAndDecommissioningBusyIndices[i] = liveAndDecommissioningBusyBlockIndices.get(i);
       }
-      byte[] excludeReconstructedIndices = new byte[excludeReconstructed.size()];
-      for (int i = 0; i < excludeReconstructed.size(); i++) {
-        excludeReconstructedIndices[i] = excludeReconstructed.get(i);
+      byte[] liveBusyIndices = new byte[liveBusyBlockIndices.size()];
+      for (int i = 0; i < liveBusyBlockIndices.size(); i++) {
+        liveBusyIndices[i] = liveBusyBlockIndices.get(i);
       }
       return new ErasureCodingWork(getBlockPoolId(), block, bc, newSrcNodes,
           containingNodes, liveReplicaNodes, additionalReplRequired,
-          priority, newIndices, busyIndices, excludeReconstructedIndices);
+          priority, newIndices, liveAndDecommissioningBusyIndices, liveBusyIndices,
+          decommissionECReconstruction);
     } else {
       return new ReplicationWork(block, bc, srcNodes,
           containingNodes, liveReplicaNodes, additionalReplRequired,
@@ -2554,7 +2559,11 @@ public class BlockManager implements BlockStatsMXBean {
    *                    replicas of the given block.
    * @param liveBlockIndices List to be populated with indices of healthy
    *                         blocks in a striped block group
-   * @param liveBusyBlockIndices List to be populated with indices of healthy
+   * @param liveAndDecommissioningBusyBlockIndices List to be populated with indices of live or
+   *                                               decommissioning blocks in a striped block group
+   *                                               in busy DN,which the recovery work have reached
+   *                                               their replication limits
+   * @param liveBusyBlockIndices List to be populated with indices of live
    *                             blocks in a striped block group in busy DN,
    *                             which the recovery work have reached their
    *                             replication limits
@@ -2568,7 +2577,8 @@ public class BlockManager implements BlockStatsMXBean {
       List<DatanodeDescriptor> containingNodes,
       List<DatanodeStorageInfo> nodesContainingLiveReplicas,
       NumberReplicas numReplicas, List<Byte> liveBlockIndices,
-      List<Byte> liveBusyBlockIndices, List<Byte> excludeReconstructed, int priority) {
+      List<Byte> liveAndDecommissioningBusyBlockIndices,
+      List<Byte> liveBusyBlockIndices, int priority) {
     containingNodes.clear();
     nodesContainingLiveReplicas.clear();
     List<DatanodeDescriptor> srcNodes = new ArrayList<>();
@@ -2636,22 +2646,26 @@ public class BlockManager implements BlockStatsMXBean {
           && (!node.isDecommissionInProgress() && !node.isEnteringMaintenance())
           && node.getNumberOfBlocksToBeReplicated() +
           node.getNumberOfBlocksToBeErasureCoded() >= maxReplicationStreams) {
-        if (isStriped && (state == StoredReplicaState.LIVE
-            || state == StoredReplicaState.DECOMMISSIONING)) {
-          liveBusyBlockIndices.add(blockIndex);
-          //HDFS-16566 ExcludeReconstructed won't be reconstructed.
-          excludeReconstructed.add(blockIndex);
+        if (isStriped) {
+          if (state == StoredReplicaState.LIVE) {
+            liveAndDecommissioningBusyBlockIndices.add(blockIndex);
+            liveBusyBlockIndices.add(blockIndex);
+          } else if (state == StoredReplicaState.DECOMMISSIONING) {
+            liveAndDecommissioningBusyBlockIndices.add(blockIndex);
+          }
         }
         continue; // already reached replication limit
       }
 
       if (node.getNumberOfBlocksToBeReplicated() +
           node.getNumberOfBlocksToBeErasureCoded() >= replicationStreamsHardLimit) {
-        if (isStriped && (state == StoredReplicaState.LIVE
-            || state == StoredReplicaState.DECOMMISSIONING)) {
-          liveBusyBlockIndices.add(blockIndex);
-          //HDFS-16566 ExcludeReconstructed won't be reconstructed.
-          excludeReconstructed.add(blockIndex);
+        if (isStriped) {
+          if (state == StoredReplicaState.LIVE) {
+            liveAndDecommissioningBusyBlockIndices.add(blockIndex);
+            liveBusyBlockIndices.add(blockIndex);
+          } else if (state == StoredReplicaState.DECOMMISSIONING) {
+            liveAndDecommissioningBusyBlockIndices.add(blockIndex);
+          }
         }
         continue;
       }
@@ -5840,5 +5854,13 @@ public class BlockManager implements BlockStatsMXBean {
   @VisibleForTesting
   public int getMinBlocksForWrite(BlockType blockType) {
     return placementPolicies.getPolicy(blockType).getMinBlocksForWrite();
+  }
+
+  public void setDecommissionECReconstruction(boolean decommissionECReconstruction) {
+    this.decommissionECReconstruction = decommissionECReconstruction;
+  }
+
+  public boolean isDecommissionECReconstruction() {
+    return decommissionECReconstruction;
   }
 }

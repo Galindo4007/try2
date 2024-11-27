@@ -139,6 +139,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_NN_NOT_BECOME_ACTIVE_I
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_NN_NOT_BECOME_ACTIVE_IN_SAFEMODE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_IMAGE_PARALLEL_LOAD_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_IMAGE_PARALLEL_LOAD_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DECOMMISSION_EC_RECONSTRUCTION_ENABLE;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DECOMMISSION_EC_RECONSTRUCTION_ENABLE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_LOCK_DETAILED_METRICS_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_LOCK_DETAILED_METRICS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_READ_LOCK_REPORTING_THRESHOLD_MS_DEFAULT;
@@ -383,7 +385,8 @@ public class NameNode extends ReconfigurableBase implements
           DFS_NAMENODE_LOCK_DETAILED_METRICS_KEY,
           DFS_NAMENODE_WRITE_LOCK_REPORTING_THRESHOLD_MS_KEY,
           DFS_NAMENODE_READ_LOCK_REPORTING_THRESHOLD_MS_KEY,
-          DFS_NAMENODE_SLOWPEER_COLLECT_INTERVAL_KEY));
+          DFS_NAMENODE_SLOWPEER_COLLECT_INTERVAL_KEY,
+          DFS_NAMENODE_DECOMMISSION_EC_RECONSTRUCTION_ENABLE));
 
   private static final String USAGE = "Usage: hdfs namenode ["
       + StartupOption.BACKUP.getName() + "] | \n\t["
@@ -2356,7 +2359,8 @@ public class NameNode extends ReconfigurableBase implements
         || property.equals(DFS_NAMENODE_REPLICATION_STREAMS_HARD_LIMIT_KEY)
         || property.equals(
             DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION)
-        || property.equals(DFS_NAMENODE_RECONSTRUCTION_PENDING_TIMEOUT_SEC_KEY)) {
+        || property.equals(DFS_NAMENODE_RECONSTRUCTION_PENDING_TIMEOUT_SEC_KEY)
+        || property.equals(DFS_NAMENODE_DECOMMISSION_EC_RECONSTRUCTION_ENABLE)) {
       return reconfReplicationParameters(newVal, property);
     } else if (property.equals(DFS_BLOCK_REPLICATOR_CLASSNAME_KEY) || property
         .equals(DFS_BLOCK_PLACEMENT_EC_CLASSNAME_KEY)) {
@@ -2395,19 +2399,19 @@ public class NameNode extends ReconfigurableBase implements
   private String reconfReplicationParameters(final String newVal,
       final String property) throws ReconfigurationException {
     BlockManager bm = namesystem.getBlockManager();
-    int newSetting;
+    String newSetting;
     namesystem.writeLock();
     try {
       if (property.equals(DFS_NAMENODE_REPLICATION_MAX_STREAMS_KEY)) {
         bm.setMaxReplicationStreams(
             adjustNewVal(DFS_NAMENODE_REPLICATION_MAX_STREAMS_DEFAULT, newVal));
-        newSetting = bm.getMaxReplicationStreams();
+        newSetting = Integer.toString(bm.getMaxReplicationStreams());
       } else if (property.equals(
           DFS_NAMENODE_REPLICATION_STREAMS_HARD_LIMIT_KEY)) {
         bm.setReplicationStreamsHardLimit(
             adjustNewVal(DFS_NAMENODE_REPLICATION_STREAMS_HARD_LIMIT_DEFAULT,
                 newVal));
-        newSetting = bm.getReplicationStreamsHardLimit();
+        newSetting = Integer.toString(bm.getReplicationStreamsHardLimit());
       } else if (
           property.equals(
               DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION)) {
@@ -2415,7 +2419,7 @@ public class NameNode extends ReconfigurableBase implements
             adjustNewVal(
                 DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION_DEFAULT,
                 newVal));
-        newSetting = bm.getBlocksReplWorkMultiplier();
+        newSetting = Integer.toString(bm.getBlocksReplWorkMultiplier());
       } else if (
           property.equals(
               DFS_NAMENODE_RECONSTRUCTION_PENDING_TIMEOUT_SEC_KEY)) {
@@ -2423,13 +2427,19 @@ public class NameNode extends ReconfigurableBase implements
             adjustNewVal(
                 DFS_NAMENODE_RECONSTRUCTION_PENDING_TIMEOUT_SEC_DEFAULT,
                 newVal));
-        newSetting = bm.getReconstructionPendingTimeout();
+        newSetting = Integer.toString(bm.getReconstructionPendingTimeout());
+      } else if (property.equals(DFS_NAMENODE_DECOMMISSION_EC_RECONSTRUCTION_ENABLE)) {
+        boolean decommissionECReconstruction =
+            (newVal == null) ? DFS_NAMENODE_DECOMMISSION_EC_RECONSTRUCTION_ENABLE_DEFAULT :
+                Boolean.parseBoolean(newVal);
+        bm.setDecommissionECReconstruction(decommissionECReconstruction);
+        newSetting = Boolean.toString(bm.isDecommissionECReconstruction());
       } else {
         throw new IllegalArgumentException("Unexpected property " +
             property + " in reconfReplicationParameters");
       }
       LOG.info("RECONFIGURE* changed {} to {}", property, newSetting);
-      return String.valueOf(newSetting);
+      return newSetting;
     } catch (IllegalArgumentException e) {
       throw new ReconfigurationException(property, newVal, getConf().get(
           property), e);

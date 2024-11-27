@@ -1233,6 +1233,14 @@
   </description>
 </property>
 
+  <property>
+    <name>dfs.namenode.decommission.ec.reconstruction.enable</name>
+    <value>false</value>
+    <description>
+      Whether to use reconstruction to copy ec block when the related node is busy.
+    </description>
+  </property>
+
 <property>
   <name>dfs.namenode.redundancy.interval.seconds</name>
   <value>3</value>

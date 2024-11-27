@@ -1157,4 +1157,169 @@ public class TestDecommissionWithStriped {
         originBytesArray, readBytesArray, ecPolicy);
     cleanupFile(dfs, ecFile);
   }
+
+  @Test(timeout = 120000)
+  public void testDecommissionBusyNodeWithECReconstruction1() throws Exception {
+    bm.setDecommissionECReconstruction(false);
+    byte[] indices = new byte[]{6};
+    // 1 create EC file
+    final Path ecFile = new Path(ecDir, "testDecommission2NodeWithBusyNode");
+    int writeBytes = cellSize * dataBlocks;
+    writeStripedFile(dfs, ecFile, writeBytes);
+
+    Assert.assertEquals(0, bm.numOfUnderReplicatedBlocks());
+    FileChecksum fileChecksum1 = dfs.getFileChecksum(ecFile, writeBytes);
+
+    // 2 make datanode busy
+    INodeFile fileNode =
+        cluster.getNamesystem().getFSDirectory().getINode4Write(ecFile.toString()).asFile();
+    BlockInfo firstBlock = fileNode.getBlocks()[0];
+    List<DatanodeStorageInfo> storageInfos =
+        getStorageInfoForBlockIndex((BlockInfoStriped) firstBlock, indices);
+    assertEquals(1, storageInfos.size());
+    DatanodeDescriptor busyNode = storageInfos.get(0).getDatanodeDescriptor();
+    for (int j = 0; j < replicationStreamsHardLimit; j++) {
+      busyNode.incrementPendingReplicationWithoutTargets();
+    }
+    DatanodeStorageInfo toDecommissionStorage = storageInfos.get(0);
+
+    // 3 decommissioning one datanode
+    List<DatanodeInfo> decommissionNodes = new ArrayList<>();
+    decommissionNodes.add(storageInfos.get(0).getDatanodeDescriptor());
+    decommissionNode(0, decommissionNodes, AdminStates.DECOMMISSION_INPROGRESS);
+
+    // 4 verify the replica is not copied or reconstructed
+    Thread.sleep(3000);
+    assertEquals(8, bm.countNodes(firstBlock).liveReplicas());
+    assertEquals(1, bm.countNodes(firstBlock).decommissioning());
+    assertEquals(0, cluster.getDataNodes().stream()
+        .mapToLong(dn -> dn.getMetrics().getECReconstructionTasks()).sum());
+
+    // 5 verify the replica is reconstructed
+    bm.setDecommissionECReconstruction(true);
+    decommissionNode(0, decommissionNodes, AdminStates.DECOMMISSIONED);
+    assertEquals(9, bm.countNodes(firstBlock).liveReplicas());
+    assertEquals(1, bm.countNodes(firstBlock).decommissioned());
+    assertEquals(0, cluster.getDataNodes().stream()
+        .mapToLong(dn -> dn.getMetrics().getBlocksReplicated()).sum());
+    assertTrue(cluster.getDataNodes().stream()
+        .mapToLong(dn -> dn.getMetrics().getECReconstructionTasks()).sum() > 0);
+
+    // 6 Get getBlocks again, verity that the decommissioned index already has a LIVE replica,
+    // and confirm verify the DECOMMISSIONED replica is the previously offline replica
+    fileNode = cluster.getNamesystem().getFSDirectory().getINode(ecFile.toString()).asFile();
+    firstBlock = fileNode.getBlocks()[0];
+    List<DatanodeStorageInfo> newStorageInfos =
+        getStorageInfoForBlockIndex((BlockInfoStriped) firstBlock, indices);
+    assertTrue(newStorageInfos.size() >= 2);
+    DatanodeStorageInfo decommissionedNode = null;
+    int alive = 0;
+    for (int i = 0; i < newStorageInfos.size(); i++) {
+      DatanodeStorageInfo datanodeStorageInfo = newStorageInfos.get(i);
+      if (datanodeStorageInfo.getDatanodeDescriptor().isDecommissioned()) {
+        decommissionedNode = datanodeStorageInfo;
+      } else if (datanodeStorageInfo.getDatanodeDescriptor().isAlive()) {
+        alive++;
+      }
+    }
+    assertNotNull(decommissionedNode);
+    assertEquals(toDecommissionStorage, decommissionedNode);
+    assertTrue(alive >= 1);
+
+    // 7  check the checksum of a file
+    FileChecksum fileChecksum2 = dfs.getFileChecksum(ecFile, writeBytes);
+    Assert.assertEquals("Checksum mismatches!", fileChecksum1, fileChecksum2);
+
+    // 8 check the data is correct
+    StripedFileTestUtil.checkData(dfs, ecFile, writeBytes, decommissionNodes,
+        null, blockGroupSize);
+  }
+
+  @Test(timeout = 120000)
+  public void testDecommissionBusyNodeWithECReconstruction2() throws Exception {
+    bm.setDecommissionECReconstruction(false);
+    byte[] indices = new byte[]{5, 6};
+    // 1 create EC file
+    final Path ecFile = new Path(ecDir, "testDecommission2NodeWithBusyNode");
+    int writeBytes = cellSize * dataBlocks;
+    writeStripedFile(dfs, ecFile, writeBytes);
+
+    assertEquals(0, bm.numOfUnderReplicatedBlocks());
+    FileChecksum fileChecksum1 = dfs.getFileChecksum(ecFile, writeBytes);
+
+    // 2 make one datanode busy
+    INodeFile fileNode =
+        cluster.getNamesystem().getFSDirectory().getINode4Write(ecFile.toString()).asFile();
+    BlockInfo firstBlock = fileNode.getBlocks()[0];
+    List<DatanodeStorageInfo> storageInfos =
+        getStorageInfoForBlockIndex((BlockInfoStriped) firstBlock, indices);
+    assertEquals(2, storageInfos.size());
+    DatanodeDescriptor busyNode = storageInfos.get(0).getDatanodeDescriptor();
+    for (int j = 0; j < replicationStreamsHardLimit; j++) {
+      busyNode.incrementPendingReplicationWithoutTargets();
+    }
+
+    // 3 decommissioning two datanode
+    List<DatanodeInfo> decommissionNodes = new ArrayList<>();
+    decommissionNodes.add(storageInfos.get(0).getDatanodeDescriptor());
+    decommissionNodes.add(storageInfos.get(1).getDatanodeDescriptor());
+    decommissionNode(0, decommissionNodes, AdminStates.DECOMMISSION_INPROGRESS);
+
+    // 4 Verify that the non-busy replica has been copied and the busy replica is
+    // reconstructed after decommissionECReconstruction is enabled.
+    bm.setDecommissionECReconstruction(true);
+    decommissionNode(0, decommissionNodes, AdminStates.DECOMMISSIONED);
+    assertEquals(9, bm.countNodes(firstBlock).liveReplicas());
+    assertEquals(2, bm.countNodes(firstBlock).decommissioned());
+    assertTrue(cluster.getDataNodes().stream()
+        .mapToLong(dn -> dn.getMetrics().getBlocksReplicated()).sum() > 0);
+    assertTrue(cluster.getDataNodes().stream()
+        .mapToLong(dn -> dn.getMetrics().getECReconstructionTasks()).sum() > 0);
+
+    // 5 Get getBlocks again, verity that the decommissioned index already has a LIVE replica,
+    // and confirm verify the DECOMMISSIONED replica is the previously offline replica
+    fileNode = cluster.getNamesystem().getFSDirectory().getINode(ecFile.toString()).asFile();
+    firstBlock = fileNode.getBlocks()[0];
+    List<DatanodeStorageInfo> newStorageInfos =
+        getStorageInfoForBlockIndex((BlockInfoStriped) firstBlock, indices);
+    assertTrue(newStorageInfos.size() >= 4);
+    int alive = 0;
+    int decommissioned = 0;
+    for (int i = 0; i < newStorageInfos.size(); i++) {
+      DatanodeStorageInfo newDatanodeStorageInfo = newStorageInfos.get(i);
+      if (newDatanodeStorageInfo.getDatanodeDescriptor().isDecommissioned()) {
+        assertTrue(newDatanodeStorageInfo.equals(storageInfos.get(0)) ||
+            newDatanodeStorageInfo.equals(storageInfos.get(1)));
+        decommissioned++;
+      } else if (newDatanodeStorageInfo.getDatanodeDescriptor().isAlive()) {
+        alive++;
+      }
+    }
+    assertTrue(alive >= 2);
+    assertEquals(2, decommissioned);
+
+    // 6  check the checksum of a file
+    FileChecksum fileChecksum2 = dfs.getFileChecksum(ecFile, writeBytes);
+    assertEquals("Checksum mismatches!", fileChecksum1, fileChecksum2);
+
+    // 7 check the data is correct
+    StripedFileTestUtil.checkData(dfs, ecFile, writeBytes, decommissionNodes,
+        null, blockGroupSize);
+  }
+
+  private List<DatanodeStorageInfo> getStorageInfoForBlockIndex(BlockInfoStriped block,
+      byte[] blockIndices) {
+    List<DatanodeStorageInfo> storageInfos = new ArrayList<>();
+    Iterator<BlockInfoStriped.StorageAndBlockIndex> iterator =
+        block.getStorageAndIndexInfos().iterator();
+    while (iterator.hasNext()) {
+      BlockInfoStriped.StorageAndBlockIndex storageAndBlockIndex = iterator.next();
+      for (int blockIndex : blockIndices) {
+        if (storageAndBlockIndex.getBlockIndex() == blockIndex) {
+          storageInfos.add(storageAndBlockIndex.getStorage());
+        }
+      }
+    }
+    return storageInfos;
+  }
 }
